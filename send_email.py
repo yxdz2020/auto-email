@@ -7,7 +7,6 @@ from email.mime.text import MIMEText
 # 从 GitHub Secrets 中读取 JSON 格式的邮件配置信息
 config_json = os.getenv('EMAIL_CONFIG')
 config = json.loads(config_json)
-
 smtp_server = config['smtp_server']
 smtp_port = config['smtp_port']
 smtp_user = config['smtp_user']
