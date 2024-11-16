@@ -1,9 +1,9 @@
 // 从环境变量中获取配置
-const resendApiKey = RESEND_API_KEY;  // Resend API 密钥
-const fromEmail = FROM_EMAIL;  // 发件人邮箱
-const toEmails = JSON.parse(TO_EMAILS);  // 收件人邮箱列表，环境变量存储的是一个 JSON 字符串
-const subject = SUBJECT;  // 邮件主题
-const body = BODY;  // 邮件正文
+const resendApiKey = RESEND_API_KEY; // Resend API 密钥
+const fromEmail = FROM_EMAIL; // 发件人邮箱
+const subject = SUBJECT; // 邮件主题
+const body = BODY; // 邮件正文
+const toEmails = TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);
 
 // 用于发送邮件的函数
 async function sendEmail(toEmail) {
@@ -40,11 +40,12 @@ async function handleRequest(event) {
     return new Response('Emails sent successfully!', { status: 200 });
 }
 
+// HTTP 触发器
 addEventListener('fetch', event => {
     event.respondWith(handleRequest(event));
 });
 
-// Cloudflare Worker 定时触发器
+// 定时触发器
 addEventListener('scheduled', event => {
     event.waitUntil(handleRequest(event));
 });
