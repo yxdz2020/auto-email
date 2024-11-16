@@ -29,7 +29,7 @@
 
 到 [resend](https://resend.com/) 注册一个账号，申请 `apitoken`，并且绑定一个域名，根据 resend 的提示到域名托管商处添加相应的 dns 解析记录，有三个 `txt` 和一个 `mx` 记录
 
-在 cf 新建一个 wokrer，粘贴仓库内 `_worker.js` 中的内容
+在 cf 新建一个 wokrer，粘贴仓库内 `resend.js` 中的内容
 
 设置以下环境变量：
 
