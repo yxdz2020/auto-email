@@ -1,6 +1,6 @@
 // 从环境变量中获取配置
 const resendApiKey = RESEND_API_KEY; // Resend API 密钥
-const fromEmail = FROM_EMAIL; // 发件人邮箱
+const fromEmail = FROM_EMAIL || onboarding@resend.dev; // 发件人邮箱
 const subject = SUBJECT; // 邮件主题
 const body = BODY; // 邮件正文
 const toEmails = TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email); // 解析收件人
