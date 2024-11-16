@@ -27,16 +27,16 @@
 
 ## 部署方式二：cf worker
 
-到 [resend](https://resend.com/) 注册一个账号，申请 `apitoken`
+到 [resend](https://resend.com/) 注册一个账号，申请 `apitoken`，并且绑定一个域名，根据 resend 的提示到域名托管商处添加相应的 dns 解析记录，有三个 `txt` 和一个 `mx` 记录
 
 在 cf 新建一个 wokrer，粘贴仓库内 `_worker.js` 中的内容
 
 设置以下环境变量：
 
 - RESEND_API_KEY = 填刚刚申请的 `apitoken`
-- FROM_EMAIL = 发件人邮箱
+- FROM_EMAIL = 发件人邮箱，邮箱域名必须与在 resend 中绑定的域名一致，前缀随意
 - TO_EMAILS = 收件人邮箱，支持多个邮箱地址，每行一个
 - SUBJECT = 邮件主题
 - BODY = 邮件正文
 
-设置 corn 触发器，实现定时自动群发邮件
+设置 `corn` 触发器，实现定时自动群发邮件
