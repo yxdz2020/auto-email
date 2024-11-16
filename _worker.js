@@ -7,10 +7,11 @@ const fromEmail = FROM_EMAIL;  // 发件人邮箱
 const toEmails = JSON.parse(TO_EMAILS);  // 收件人邮箱列表，环境变量存储的是一个 JSON 字符串
 const subject = SUBJECT;  // 邮件主题
 const body = BODY;  // 邮件正文
+const mailgunApiKey = MAILGUN_API_KEY;  // 从环境变量中获取 Mailgun API 密钥
 
 // 用于发送邮件的函数
 async function sendEmail(toEmail) {
-    const url = 'https://api.mailgun.net/v3/your-domain.com/messages'; // Mailgun API URL
+    const url = `https://api.mailgun.net/v3/your-domain.com/messages`; // Mailgun API URL
 
     // 使用 Mailgun API 发送邮件
     const formData = new FormData();
@@ -22,7 +23,7 @@ async function sendEmail(toEmail) {
     const response = await fetch(url, {
         method: 'POST',
         headers: {
-            'Authorization': 'Basic ' + btoa('api:' + smtpPass), // 使用 Mailgun API 密钥
+            'Authorization': 'Basic ' + btoa('api:' + mailgunApiKey), // 使用环境变量中的 API 密钥
         },
         body: formData,
     });
