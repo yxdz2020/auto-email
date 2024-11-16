@@ -40,3 +40,5 @@
 - BODY = 邮件正文
 
 设置 `corn` 触发器，实现定时自动群发邮件
+
+> 另一个免费的邮件群发api：[mailersend](https://app.mailersend.com/domains)
