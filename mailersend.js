@@ -1,7 +1,7 @@
 // 群发邮件的主逻辑
 async function handleRequest(request, env) {
-    const mailersendApiKey = env.MAILERSEND_API_KEY || "";  // 从环境变量获取 Mailersend API 密钥
-    const fromEmail = env.FROM_EMAIL || "admin@yu888.ggff.net";  // 从环境变量获取发件人邮箱
+    const resendApiKey = env.RESEND_API_KEY || "";  // 从环境变量获取 Resend API 密钥
+    const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";  // 从环境变量获取发件人邮箱
     const subject = env.SUBJECT || "邮件测试";  // 从环境变量获取邮件主题
     const body = env.BODY || "这是一封来自自动化脚本的邮件";  // 从环境变量获取邮件正文
     const tgToken = env.TG_TOKEN;  // Telegram Bot API Token
@@ -9,7 +9,7 @@ async function handleRequest(request, env) {
     const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);  // 解析收件人
     const results = await Promise.all(
         toEmails.map(async (email) => {
-            const success = await sendEmail(email, mailersendApiKey, fromEmail, subject, body, tgToken, tgId);
+            const success = await sendEmail(email, resendApiKey, fromEmail, subject, body, tgToken, tgId);
             return { email, success };
         })
     );
@@ -48,17 +48,11 @@ async function sendTelegramNotification(message, tgToken, tgId) {
 }
 
 // 用于发送邮件的函数
-async function sendEmail(toEmail, mailersendApiKey, fromEmail, subject, body, tgToken, tgId) {
-    const url = 'https://api.mailersend.com/v1/email'; // Mailersend API URL
+async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body, tgToken, tgId) {
+    const url = 'https://api.resend.com/emails'; // Resend API URL
     const emailData = {
-        from: {
-            email: fromEmail
-        },
-        to: [
-            {
-                email: toEmail
-            }
-        ],
+        from: fromEmail,
+        to: toEmail,  // 这里只需要一个收件人邮箱
         subject: subject,
         text: body,  // 邮件正文（纯文本）
     };
@@ -66,7 +60,7 @@ async function sendEmail(toEmail, mailersendApiKey, fromEmail, subject, body, tg
     const response = await fetch(url, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${mailersendApiKey}`,  // 使用 Bearer Token 验证
+            'Authorization': `Bearer ${resendApiKey}`,  // 使用 Bearer Token 验证
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(emailData),
