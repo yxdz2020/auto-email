@@ -13,7 +13,7 @@ async function handleRequest(request, env) {
     const results = await Promise.all(
         toEmails.map(async (email) => {
             try {
-                const success = await sendEmail(email, mailersendApiKey, fromEmail, subject, body, tgToken, tgId);
+                const success = await sendEmail(email, resendApiKey, fromEmail, subject, body, tgToken, tgId);
                 return { email, success };
             } catch (error) {
                 console.log(`发送邮件到 ${email} 时发生错误: ${error.message}`);
