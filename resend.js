@@ -1,16 +1,25 @@
 // 群发邮件的主逻辑
 async function handleRequest(request, env) {
     const resendApiKey = env.RESEND_API_KEY || "";  // 从环境变量获取 Resend API 密钥
+    if (!resendApiKey) { throw new Error("RESEND_API_KEY 未设置或为空，无法发送邮件！"); }
     const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";  // 从环境变量获取发件人邮箱
     const subject = env.SUBJECT || "邮件测试";  // 从环境变量获取邮件主题
     const body = env.BODY || "这是一封来自自动化脚本的邮件";  // 从环境变量获取邮件正文
     const tgToken = env.TG_TOKEN;  // Telegram Bot API Token
     const tgId = env.TG_ID;  // 目标 Telegram chat ID
     const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);  // 解析收件人
+    if (toEmails.length === 0) { throw new Error("没有有效的收件人邮箱地址"); }
+
     const results = await Promise.all(
         toEmails.map(async (email) => {
-            const success = await sendEmail(email, resendApiKey, fromEmail, subject, body, tgToken, tgId);
-            return { email, success };
+            try {
+                const success = await sendEmail(email, mailersendApiKey, fromEmail, subject, body, tgToken, tgId);
+                return { email, success };
+            } catch (error) {
+                console.log(`发送邮件到 ${email} 时发生错误: ${error.message}`);
+                await sendTelegramNotification(`❌ 发送邮件到 **${email}** 失败: ${error.message}`, tgToken, tgId);
+                return { email, success: false };
+            }
         })
     );
 
