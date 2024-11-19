@@ -1,6 +1,6 @@
 // 群发邮件的主逻辑
 async function handleRequest(request, env) {
-    const resendApiKey = env.RESEND_API_KEY;  // 从环境变量获取 Resend API 密钥
+    const resendApiKey = env.RESEND_API_KEY || "";  // 从环境变量获取 Resend API 密钥
     const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";  // 从环境变量获取发件人邮箱
     const subject = env.SUBJECT || "邮件测试";  // 从环境变量获取邮件主题
     const body = env.BODY || "这是一封来自自动化脚本的邮件";  // 从环境变量获取邮件正文
