@@ -7,7 +7,6 @@ async function handleRequest(request, env) {
     const tgToken = env.TG_TOKEN;  // Telegram Bot API Token
     const tgId = env.TG_ID;  // 目标 Telegram chat ID
     const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);  // 解析收件人
-
     const results = await Promise.all(
         toEmails.map(async (email) => {
             const success = await sendEmail(email, resendApiKey, fromEmail, subject, body, tgToken, tgId);
@@ -53,7 +52,7 @@ async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body, tgToke
     const url = 'https://api.resend.com/emails'; // Resend API URL
     const emailData = {
         from: fromEmail,
-        to: toEmail,
+        to: toEmail,  // 这里只需要一个收件人邮箱
         subject: subject,
         text: body,  // 邮件正文（纯文本）
     };
