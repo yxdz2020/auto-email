@@ -36,6 +36,8 @@
 - RESEND_API_KEY = 填刚刚申请的 `apitoken`
 - FROM_EMAIL = 发件人邮箱，邮箱域名必须与在 resend 中绑定的域名一致，前缀随意
 - TO_EMAILS = 收件人邮箱，支持多个邮箱地址，每行一个
+- TG_ID = TG 机器人的 chat id
+- TG_TOKEN = TG 机器人的 token
 - SUBJECT = 邮件主题
 - BODY = 邮件正文
 
