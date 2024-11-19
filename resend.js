@@ -1,10 +1,9 @@
 // 从环境变量中获取配置（通过 env 参数传递）
 async function sendEmail(toEmail, env) {
     const resendApiKey = env.RESEND_API_KEY; // Resend API 密钥
-    const fromEmail = env.FROM_EMAIL || "onboarding@resend.dev"; // 发件人邮箱
+    const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net"; // 发件人邮箱
     const subject = env.SUBJECT || "定时邮件通知"; // 邮件主题
     const body = env.BODY || "这是一封来自自动化脚本的邮件"; // 邮件正文
-
     const url = `https://api.resend.com/emails`; // Resend API URL
     const emailData = {
         from: fromEmail,
@@ -68,7 +67,6 @@ async function handleRequest(event, env) {
     const toEmails = env.TO_EMAILS.split('\n')
         .map(email => email.trim())
         .filter(email => email); // 解析收件人
-
     const results = await Promise.all(
         toEmails.map(async (email) => {
             const success = await sendEmail(email, env);
