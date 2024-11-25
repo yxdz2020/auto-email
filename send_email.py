@@ -1,6 +1,7 @@
 import smtplib
 import json
 import os
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -27,7 +28,14 @@ body = config['body']
 if not isinstance(to_emails, list):
     raise ValueError("配置中的 'to_emails' 应为一个邮件地址列表")
 
+# 从 GitHub Secrets 中读取 Telegram 配置
+tg_id = os.getenv('TG_ID')
+tg_token = os.getenv('TG_TOKEN')
+if not tg_id or not tg_token:
+    raise ValueError("Telegram 配置缺失，请确保 TG_ID 和 TG_TOKEN 已设置为仓库的机密变量")
+
 def send_email(to_email):
+    """发送邮件"""
     # 设置邮件内容
     msg = MIMEMultipart()
     msg['From'] = from_email
@@ -52,13 +60,47 @@ def send_email(to_email):
                 server.sendmail(from_email, to_email, msg.as_string())
         else:
             print(f"不支持的端口号: {smtp_port}")
-            return
+            return False
 
         print(f"邮件已成功发送到 {to_email}")
+        return True
     except Exception as e:
         print(f"发送邮件到 {to_email} 失败: {str(e)}")
+        return str(e)
+
+def send_telegram_notification(success_emails, failed_emails):
+    """发送 Telegram 消息（Markdown 格式）"""
+    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails])
+    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails])
+
+    message = success_message + "\n\n" + failed_message
+
+    url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+    payload = {
+        "chat_id": tg_id,
+        "text": message,
+        "parse_mode": "Markdown",  # 使用 Markdown 格式
+    }
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("Telegram 通知发送成功")
+        else:
+            print(f"Telegram 通知发送失败: {response.status_code}, {response.text}")
+    except Exception as e:
+        print(f"发送 Telegram 通知时出现异常: {str(e)}")
 
 if __name__ == "__main__":
+    success_emails = []
+    failed_emails = []
+
     # 群发邮件
     for email in to_emails:
-        send_email(email)
+        result = send_email(email)
+        if result is True:
+            success_emails.append(email)
+        else:
+            failed_emails.append(f"{email} - {result}")
+
+    # 发送 Telegram 通知
+    send_telegram_notification(success_emails, failed_emails)
