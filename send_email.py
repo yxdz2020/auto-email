@@ -64,7 +64,7 @@ def send_email(to_email):
         return True
     except Exception as e:
         print(f"发送邮件到 {to_email} 失败: {str(e)}")
-        return str(e)
+        return False
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
@@ -95,10 +95,10 @@ if __name__ == "__main__":
     # 群发邮件
     for email in to_emails:
         result = send_email(email)
-        if result is True:
+        if result:
             success_emails.append(email)
         else:
-            failed_emails.append(f"{email} - {result}")
+            failed_emails.append(email)
 
     # 仅在 TG_ID 和 TG_TOKEN 存在时发送 Telegram 通知
     if send_telegram:
