@@ -31,18 +31,16 @@ if not isinstance(to_emails, list):
 # 从 GitHub Secrets 中读取 Telegram 配置
 tg_id = os.getenv('TG_ID')
 tg_token = os.getenv('TG_TOKEN')
-if not tg_id or not tg_token:
-    raise ValueError("Telegram 配置缺失，请确保 TG_ID 和 TG_TOKEN 已设置为仓库的机密变量")
+
+# 仅在 TG_ID 和 TG_TOKEN 同时存在时才发送 Telegram 通知
+send_telegram = tg_id and tg_token
 
 def send_email(to_email):
     """发送邮件"""
-    # 设置邮件内容
     msg = MIMEMultipart()
     msg['From'] = from_email
     msg['To'] = to_email
     msg['Subject'] = subject
-
-    # 支持 HTML 内容
     msg.attach(MIMEText(body, 'html'))
 
     try:
@@ -102,5 +100,8 @@ if __name__ == "__main__":
         else:
             failed_emails.append(f"{email} - {result}")
 
-    # 发送 Telegram 通知
-    send_telegram_notification(success_emails, failed_emails)
+    # 仅在 TG_ID 和 TG_TOKEN 存在时发送 Telegram 通知
+    if send_telegram:
+        send_telegram_notification(success_emails, failed_emails)
+    else:
+        print("Telegram 通知配置缺失，跳过发送 Telegram 通知。")
