@@ -1,14 +1,23 @@
 // 群发邮件的主逻辑
 async function handleRequest(request, env) {
-    const resendApiKey = env.RESEND_API_KEY || "";  // 从环境变量获取 Resend API 密钥
-    if (!resendApiKey) { throw new Error("RESEND_API_KEY 未设置或为空，无法发送邮件！"); }
-    const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";  // 从环境变量获取发件人邮箱
-    const subject = env.SUBJECT || "邮件测试";  // 从环境变量获取邮件主题
-    const body = env.BODY || "这是一封来自自动化脚本的邮件";  // 从环境变量获取邮件正文
-    const tgToken = env.TG_TOKEN;  // Telegram Bot API Token
-    const tgId = env.TG_ID;  // 目标 Telegram chat ID
-    const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);  // 解析收件人
-    if (toEmails.length === 0) { throw new Error("没有有效的收件人邮箱地址"); }
+    try {
+        // 验证必要的环境变量
+        const requiredVars = ['RESEND_API_KEY', 'FROM_EMAIL', 'TO_EMAILS', 'TG_TOKEN', 'TG_ID'];
+        for (const varName of requiredVars) {
+            if (!env[varName]) {
+                throw new Error(`环境变量 ${varName} 未设置`);
+            }
+        }
+        
+        const resendApiKey = env.RESEND_API_KEY || "";  // 从环境变量获取 Resend API 密钥
+        if (!resendApiKey) { throw new Error("RESEND_API_KEY 未设置或为空，无法发送邮件！"); }
+        const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";  // 从环境变量获取发件人邮箱
+        const subject = env.SUBJECT || "邮件测试";  // 从环境变量获取邮件主题
+        const body = env.BODY || "这是一封来自自动化脚本的邮件";  // 从环境变量获取邮件正文
+        const tgToken = env.TG_TOKEN;  // Telegram Bot API Token
+        const tgId = env.TG_ID;  // 目标 Telegram chat ID
+        const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);  // 解析收件人
+        if (toEmails.length === 0) { throw new Error("没有有效的收件人邮箱地址"); }
 
     const results = await Promise.all(
         toEmails.map(async (email) => {
@@ -36,23 +45,30 @@ async function handleRequest(request, env) {
 
 // 发送 Telegram 消息的函数
 async function sendTelegramNotification(message, tgToken, tgId) {
-    const url = `https://api.telegram.org/bot${tgToken}/sendMessage`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            chat_id: tgId,
-            text: message,
-            parse_mode: 'Markdown'  // 使用 Markdown 格式
-        }),
-    });
+    if (!tgToken || !tgId) {
+        console.log('Telegram 配置未完成，跳过通知');
+        return;
+    }
 
-    if (response.ok) {
-        console.log('TG 通知发送成功');
-    } else {
-        console.log(`TG 通知发送失败: ${response.status}`);
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: tgId,
+                text: message,
+                parse_mode: 'Markdown'
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Telegram API 错误: ${error}`);
+        }
+    } catch (error) {
+        console.error('发送 Telegram 通知失败:', error.message);
     }
 }
 
@@ -86,12 +102,15 @@ async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body, tgToke
     }
 }
 
-// HTTP 触发器
+// HTTP 触发器 - 用于手动触发邮件发送
 addEventListener('fetch', event => {
     event.respondWith(handleRequest(event.request, event.env));
 });
 
-// 定时触发器（Cron Jobs）
+// 定时触发器 - 用于自动定时发送邮件
 addEventListener('scheduled', event => {
-    event.waitUntil(handleRequest(event, event.env));
+    const mockRequest = new Request('https://example.com', {  // 使用 example.com
+        method: 'POST'
+    });
+    event.waitUntil(handleRequest(mockRequest, event.env));
 });
