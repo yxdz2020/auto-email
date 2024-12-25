@@ -26,9 +26,9 @@
 ```
 **若需要tg通知，则新增以下两个变量**
 
-- TG_ID tg机器人用户ID
+- TG_ID = tg机器人用户ID
 
-- TG_TOKEN  tg机器人token
+- TG_TOKEN = tg机器人token
 
 ## 部署方式二：cf worker
 
