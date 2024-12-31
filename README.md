@@ -1,15 +1,16 @@
 # auto-email
-自动定时群发邮件
+
+> 自动定时群发邮件
 
 ## 部署方式一：github action（推荐）
 
-在你的 GitHub 仓库中，依次点击 Settings -> Secrets -> Actions，然后点击 New repository secret，创建一个名为`EMAIL_CONFIG`的机密变量，内容为你的邮件配置信息。
+在你的 GitHub 仓库中，依次点击 **`Settings` --> `Secrets and variables` --> `Actions`**，然后点击 `New repository secret`，创建一个名为 `EMAIL_CONFIG` 的机密变量，内容为你的邮件配置信息。
 
-`EMAIL_CONFIG`机密变量的`JSON`格式如下：
+`EMAIL_CONFIG` 机密变量的 `JSON` 格式如下：
 ```
 {
   "smtp_server": "smtp.example.com",
-  "smtp_port": 587,
+  "smtp_port": 465,
   "smtp_user": "your_email@example.com",
   "smtp_pass": "your_password",
   "from_email": "your_email@example.com",
@@ -24,6 +25,19 @@
   "body": "这是一封来自自动化脚本的邮件。"
 }
 ```
+> 关于一些变量的说明
+```
+smtp_server: SMTP服务器，例如：网易邮箱，QQ邮箱
+smtp_port: SMTP的端口，例如：465,587,25等等，要与SMTP服务器保持一致，不知道的自己百度搜索
+smtp_user: SMTP服务的用户名，这里需要替换为你的邮箱地址
+smtp_pass: SMTP服务的密码，这里需要替换为你的邮箱密码，可使用授权码
+from_email: 发件人的邮箱，建议与上面的smtp邮箱保持一致
+to_emails: 收件人的邮箱，可配置多个邮箱，一行一个
+subject: 邮件的主题，可自定义修改
+body: 邮件的主体内容，可自定义修改
+```
+> 增加安全性，加密github action运行输出的邮箱，防止被人发送骚扰邮件
+
 **若需要tg通知，则新增以下两个变量**
 
 - TG_ID = tg机器人用户ID
