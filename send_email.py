@@ -67,22 +67,15 @@ def send_email(to_email):
         return False
 
 def mask_email(email):
-    """隐藏邮箱中间部分"""
-    parts = email.split('@')
-    if len(parts) == 2:
-        local_part, domain = parts
-        if len(local_part) > 2:
-            masked = local_part[0] + '*' * (len(local_part) - 2) + local_part[-1] + '@' + domain
-        else:
-            masked = email
-    else:
-        masked = email
-    return masked
+    """隐藏邮箱地址中间部分"""
+    if len(email) > 6:  # 确保邮箱长度足够
+        return email[:3] + '*' * (len(email) - 6) + email[-3:]
+    return email  # 如果邮箱长度不足6位，不进行隐藏
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
-    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{mask_email(email)}`" for email in success_emails])
-    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{mask_email(email)}`" for email in failed_emails])
+    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails])
+    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails])
 
     message = success_message + "\n\n" + failed_message
 
@@ -109,9 +102,9 @@ if __name__ == "__main__":
     for email in to_emails:
         result = send_email(email)
         if result:
-            success_emails.append(email)
+            success_emails.append(mask_email(email))  # 隐藏成功发送的邮箱地址
         else:
-            failed_emails.append(email)
+            failed_emails.append(mask_email(email))  # 隐藏失败发送的邮箱地址
 
     # 仅在 TG_ID 和 TG_TOKEN 存在时发送 Telegram 通知
     if send_telegram:
