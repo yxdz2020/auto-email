@@ -2,6 +2,7 @@ import smtplib
 import json
 import os
 import requests
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -68,8 +69,8 @@ def send_email(to_email):
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
-    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails])
-    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails])
+    success_message = "✅ *以下邮箱发送成功*：\n" + base64.b64encode(", ".join(success_emails).encode()).decode()
+    failed_message = "❌ *以下邮箱发送失败*：\n" + base64.b64encode(", ".join(failed_emails).encode()).decode()
 
     message = success_message + "\n\n" + failed_message
 
