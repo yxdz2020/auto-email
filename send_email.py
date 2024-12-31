@@ -2,7 +2,6 @@ import smtplib
 import json
 import os
 import requests
-import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -61,7 +60,9 @@ def send_email(to_email):
             print(f"不支持的端口号: {smtp_port}")
             return False
 
-        print(f"邮件已成功发送到 {to_email}")
+        # 使用星号隐藏邮箱地址
+        masked_email = to_email[0] + '*' * (len(to_email) - 1)
+        print(f"邮件已成功发送到 {masked_email}")
         return True
     except Exception as e:
         print(f"发送邮件到 {to_email} 失败: {str(e)}")
@@ -69,8 +70,12 @@ def send_email(to_email):
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
-    success_message = "✅ *以下邮箱发送成功*：\n" + base64.b64encode(", ".join(success_emails).encode()).decode()
-    failed_message = "❌ *以下邮箱发送失败*：\n" + base64.b64encode(", ".join(failed_emails).encode()).decode()
+    # 使用星号隐藏邮箱地址
+    success_emails_masked = [email[0] + '*' * (len(email) - 1) for email in success_emails]
+    failed_emails_masked = [email[0] + '*' * (len(email) - 1) for email in failed_emails]
+
+    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails_masked])
+    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails_masked])
 
     message = success_message + "\n\n" + failed_message
 
