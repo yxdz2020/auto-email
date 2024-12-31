@@ -38,7 +38,7 @@ send_telegram = tg_id and tg_token
 def obfuscate_email(email):
     """隐藏邮箱地址中间部分，只显示头部3位和后缀"""
     local_part, domain = email.split('@')
-    return local_part[0:3] + '*' * (len(local_part) - 3) + domain
+    return local_part[0:3] + '*' * (len(local_part) - 3) + '@' + domain
 
 def send_email(to_email):
     """发送邮件"""
