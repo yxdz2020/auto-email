@@ -35,6 +35,11 @@ tg_token = os.getenv('TG_TOKEN')
 # 仅在 TG_ID 和 TG_TOKEN 同时存在时才发送 Telegram 通知
 send_telegram = tg_id and tg_token
 
+def obfuscate_email(email):
+    """隐藏邮箱地址中间部分，只显示头部3位和后缀"""
+    local_part, domain = email.split('@')
+    return local_part[0:3] + '*' * (len(local_part) - 3) + domain
+
 def send_email(to_email):
     """发送邮件"""
     msg = MIMEMultipart()
@@ -60,17 +65,12 @@ def send_email(to_email):
             print(f"不支持的端口号: {smtp_port}")
             return False
 
-        print(f"邮件已成功发送到 {mask_email(to_email)}")
+        # 使用 obfuscate_email 函数隐藏邮箱地址中间部分
+        print(f"邮件已成功发送到 {obfuscate_email(to_email)}")
         return True
     except Exception as e:
         print(f"发送邮件到 {to_email} 失败: {str(e)}")
         return False
-
-def mask_email(email):
-    """隐藏邮箱地址中间部分"""
-    if len(email) > 6:  # 确保邮箱长度足够
-        return email[:3] + '*' * (len(email) - 6) + email[-3:]
-    return email  # 如果邮箱长度不足6位，不进行隐藏
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
@@ -102,9 +102,9 @@ if __name__ == "__main__":
     for email in to_emails:
         result = send_email(email)
         if result:
-            success_emails.append(mask_email(email))  # 隐藏成功发送的邮箱地址
+            success_emails.append(email)
         else:
-            failed_emails.append(mask_email(email))  # 隐藏失败发送的邮箱地址
+            failed_emails.append(email)
 
     # 仅在 TG_ID 和 TG_TOKEN 存在时发送 Telegram 通知
     if send_telegram:
