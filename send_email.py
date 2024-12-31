@@ -35,6 +35,18 @@ tg_token = os.getenv('TG_TOKEN')
 # 仅在 TG_ID 和 TG_TOKEN 同时存在时才发送 Telegram 通知
 send_telegram = tg_id and tg_token
 
+def mask_email_for_log(email):
+    """隐藏邮箱地址中间部分，只显示头部两位和后缀"""
+    if not email or '@' not in email:
+        return email  # 如果邮箱为空或格式不正确，返回原邮箱
+    parts = email.split('@')
+    local_part = parts[0]
+    domain_part = parts[1]
+    if len(local_part) > 2:
+        return local_part[0:2] + '*' * (len(local_part) - 2) + local_part[-2:]
+    else:
+        return email  # 如果本地部分太短，不进行隐藏
+
 def send_email(to_email):
     """发送邮件"""
     msg = MIMEMultipart()
@@ -60,22 +72,20 @@ def send_email(to_email):
             print(f"不支持的端口号: {smtp_port}")
             return False
 
-        # 使用星号隐藏邮箱地址
-        masked_email = to_email[0] + '*' * (len(to_email) - 1)
+        # 隐藏邮箱地址中间部分，用于日志输出
+        masked_email = mask_email_for_log(to_email)
         print(f"邮件已成功发送到 {masked_email}")
         return True
     except Exception as e:
-        print(f"发送邮件到 {to_email} 失败: {str(e)}")
+        # 隐藏邮箱地址中间部分，用于日志输出
+        masked_email = mask_email_for_log(to_email)
+        print(f"发送邮件到 {masked_email} 失败: {str(e)}")
         return False
 
 def send_telegram_notification(success_emails, failed_emails):
     """发送 Telegram 消息（Markdown 格式）"""
-    # 使用星号隐藏邮箱地址
-    success_emails_masked = [email[0] + '*' * (len(email) - 1) for email in success_emails]
-    failed_emails_masked = [email[0] + '*' * (len(email) - 1) for email in failed_emails]
-
-    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails_masked])
-    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails_masked])
+    success_message = "✅ *以下邮箱发送成功*：\n" + "\n".join([f"`{email}`" for email in success_emails])
+    failed_message = "❌ *以下邮箱发送失败*：\n" + "\n".join([f"`{email}`" for email in failed_emails])
 
     message = success_message + "\n\n" + failed_message
 
