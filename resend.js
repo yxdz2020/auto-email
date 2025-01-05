@@ -24,21 +24,29 @@ async function handleRequest(request, env) {
         const results = await Promise.all(
             toEmails.map(async (email) => {
                 try {
-                    const success = await sendEmail(email, resendApiKey, fromEmail, subject, body, tgToken, tgId);
-                    return { email, success };
+                    const success = await sendEmail(email, resendApiKey, fromEmail, subject, body);
+                    return { email, success, error: null };
                 } catch (error) {
                     console.error(`发送邮件到 ${email} 时发生错误: ${error.message}`);
-                    await sendTelegramNotification(`❌ 发送邮件到 **${email}** 失败: ${error.message}`, tgToken, tgId);
-                    return { email, success: false };
+                    return { email, success: false, error: error.message };
                 }
             })
         );
 
-        // 分析结果
+        // 修改后的结果分析和消息格式
         const successCount = results.filter(res => res.success).length;
         const failureCount = results.length - successCount;
-        const failedEmails = results.filter(res => !res.success).map(res => res.email);
-        const resultMessage = `✅ **邮件发送统计**：\n成功: ${successCount}，失败: ${failureCount}。\n失败的邮件地址: ${failedEmails.join('\n')}`;
+        const successEmails = results.filter(res => res.success).map(res => res.email);
+        const failedResults = results.filter(res => !res.success);
+        
+        const resultMessage = `📊 邮件发送统计：
+成功: ${successCount}，失败: ${failureCount}。
+
+✅ 成功的邮件地址：
+${successEmails.join('\n')}
+
+❌失败的邮件地址:
+${failedResults.map(res => `${res.email}\n错误信息：${res.error}`).join('\n')}`;
         
         // 发送最终通知
         await sendTelegramNotification(resultMessage, tgToken, tgId);
@@ -81,7 +89,7 @@ async function sendTelegramNotification(message, tgToken, tgId) {
 }
 
 // 用于发送邮件的函数
-async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body, tgToken, tgId) {
+async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body) {
     const url = 'https://api.resend.com/emails';
     try {
         const response = await fetch(url, {
@@ -102,15 +110,13 @@ async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body, tgToke
         
         if (response.ok) {
             console.log(`邮件已成功发送到 ${toEmail}`);
-            await sendTelegramNotification(`✅ 邮件已成功发送到 **${toEmail}**`, tgToken, tgId);
             return true;
         } else {
             throw new Error(`API 返回错误: ${responseData.message || '未知错误'}`);
         }
     } catch (error) {
         console.error(`发送邮件到 ${toEmail} 失败:`, error);
-        await sendTelegramNotification(`❌ 发送邮件到 **${toEmail}** 失败: ${error.message}`, tgToken, tgId);
-        return false;
+        throw error;
     }
 }
 
