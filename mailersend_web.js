@@ -15,35 +15,72 @@ async function handleRequest(request, env) {
 
     // 路由处理
     if (url.pathname === "/config") {
+        // 验证请求方法
+        if (!["GET", "POST"].includes(request.method)) {
+            return new Response('方法不允许', { 
+                status: 405,
+                headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+            });
+        }
+
         if (request.method === "GET") {
             try {
                 const config = await env.EMAIL_CONFIG.get('email_settings');
                 return new Response(config || '{}', {
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 
+                        'Content-Type': 'application/json;charset=UTF-8',
+                        'Cache-Control': 'no-store'
+                    }
                 });
             } catch (error) {
-                return new Response('获取配置失败', { status: 500 });
+                console.error('获取配置失败:', error);
+                return new Response(JSON.stringify({ error: '获取配置失败' }), { 
+                    status: 500,
+                    headers: { 'Content-Type': 'application/json;charset=UTF-8' }
+                });
             }
         } else if (request.method === "POST") {
             try {
                 const config = await request.json();
                 await env.EMAIL_CONFIG.put('email_settings', JSON.stringify(config));
-                return new Response('配置已保存', { status: 200 });
+                return new Response('配置已保存', { 
+                    status: 200,
+                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+                });
             } catch (error) {
-                return new Response('保存配置失败', { status: 500 });
+                console.error('保存配置失败:', error);
+                return new Response('保存配置失败', { 
+                    status: 500,
+                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+                });
             }
         }
     }
 
-    if (url.pathname === "/send" && request.method === "POST") {
-        const formData = await request.formData();
-        const emailData = {
-            fromEmail: formData.get('fromEmail'),
-            toEmails: formData.get('toEmails'),
-            subject: formData.get('subject'),
-            body: formData.get('body')
-        }; 
-        return handleEmailSending(emailData, env);  // 传递 emailData 对象
+    if (url.pathname === "/send") {
+        if (request.method !== "POST") {
+            return new Response('方法不允许', { 
+                status: 405,
+                headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+            });
+        }
+
+        try {
+            const formData = await request.formData();
+            const emailData = {
+                fromEmail: formData.get('fromEmail'),
+                toEmails: formData.get('toEmails'),
+                subject: formData.get('subject'),
+                body: formData.get('body')
+            }; 
+            return handleEmailSending(emailData, env);
+        } catch (error) {
+            console.error('处理表单数据失败:', error);
+            return new Response('处理请求失败', { 
+                status: 400,
+                headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+            });
+        }
     }
 
     // 默认返回配置页面
@@ -130,6 +167,29 @@ function getConfigHTML() {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
+            .button-group {
+                margin-top: 15px;
+            }
+            .clear-button {
+                background-color: #dc3545;
+            }
+            .clear-button:hover {
+                background-color: #c82333;
+            }
+            /* 添加输入验证提示样式 */
+            input:invalid, textarea:invalid {
+                border-color: #dc3545;
+            }
+            .invalid-feedback {
+                color: #dc3545;
+                font-size: 0.875em;
+                margin-top: 0.25rem;
+                display: none;
+            }
+            input:invalid + .invalid-feedback,
+            textarea:invalid + .invalid-feedback {
+                display: block;
+            }
         </style>
     </head>
     <body>
@@ -137,86 +197,122 @@ function getConfigHTML() {
         <form id="emailForm">
             <div class="form-group">
                 <label for="fromEmail">发件人邮箱:</label>
-                <input type="email" id="fromEmail" name="fromEmail" required>
+                <input type="email" 
+                    id="fromEmail" 
+                    name="fromEmail" 
+                    placeholder="请输入发件人邮箱" 
+                    pattern="[^\\s@]+@[^\\s@]+\\.[^\\s@]+" 
+                    required>
+                <div class="invalid-feedback">请输入有效的邮箱地址</div>
             </div>
             <div class="form-group">
                 <label for="toEmails">收件人邮箱列表 (每行一个):</label>
-                <textarea id="toEmails" name="toEmails" rows="5" required></textarea>
+                <textarea id="toEmails" 
+                    name="toEmails" 
+                    rows="5" 
+                    placeholder="请输入收件人邮箱，每行一个" 
+                    required></textarea>
+                <div class="invalid-feedback">请至少输入一个有效的邮箱地址</div>
             </div>
             <div class="form-group">
                 <label for="subject">邮件主题:</label>
-                <input type="text" id="subject" name="subject" required>
+                <input type="text" 
+                    id="subject" 
+                    name="subject" 
+                    placeholder="请输入邮件主题" 
+                    required>
+                <div class="invalid-feedback">主题不能为空</div>
             </div>
             <div class="form-group">
                 <label for="body">邮件内容:</label>
-                <textarea id="body" name="body" rows="10" required></textarea>
+                <textarea id="body" 
+                    name="body" 
+                    rows="10" 
+                    placeholder="请输入邮件内容" 
+                    required></textarea>
+                <div class="invalid-feedback">邮件内容不能为空</div>
             </div>
-            <button type="submit">发送邮件</button>
+            <div class="button-group">
+                <button type="submit">发送邮件</button>
+                <button type="button" class="clear-button">清空表单</button>
+            </div>
         </form>
         <div id="result" style="display: none;" class="result"></div>
 
         <script>
             const form = document.getElementById('emailForm');
             const formFields = ['fromEmail', 'toEmails', 'subject', 'body'];
+            const urlParams = window.location.search;
+            const resultDiv = document.getElementById('result');
+            const submitButton = form.querySelector('button[type="submit"]');
+            const clearButton = form.querySelector('.clear-button');
 
-            // 页面加载时从 KV 获取配置
+            // 显示错误信息
+            function showError(message) {
+                resultDiv.textContent = message;
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+            }
+
+            // 显示成功信息
+            function showSuccess(message) {
+                resultDiv.textContent = message;
+                resultDiv.className = 'result success';
+                resultDiv.style.display = 'block';
+            }
+
+            // 加载配置
             async function loadConfig() {
                 try {
-                    const response = await fetch('/config' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''));
-                    if (response.ok) {
-                        const config = await response.json();
-                        formFields.forEach(field => {
-                            if (config[field]) {
-                                document.getElementById(field).value = config[field];
-                            }
-                        });
-                    }
+                    const response = await fetch('/config' + urlParams);
+                    if (!response.ok) throw new Error('加载配置失败');
+                    const config = await response.json();
+                    formFields.forEach(field => {
+                        const element = document.getElementById(field);
+                        if (config[field]) {
+                            element.value = config[field];
+                        }
+                    });
                 } catch (error) {
                     console.error('加载配置失败:', error);
+                    showError('加载配置失败: ' + error.message);
                 }
             }
 
-            // 保存配置到 KV
+            // 保存配置
             async function saveConfig() {
                 try {
-                    const config = {};
-                    formFields.forEach(field => {
-                        config[field] = document.getElementById(field).value;
-                    });
+                    const config = Object.fromEntries(
+                        formFields.map(field => [field, document.getElementById(field).value])
+                    );
 
-                    const response = await fetch('/config' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''), {
+                    const response = await fetch('/config' + urlParams, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(config)
                     });
 
-                    if (!response.ok) {
-                        throw new Error('保存配置失败');
-                    }
+                    if (!response.ok) throw new Error('保存配置失败');
                 } catch (error) {
                     console.error('保存配置失败:', error);
                 }
             }
 
-            // 页面加载时加载配置
+            // 事件监听器
             window.addEventListener('load', loadConfig);
 
-            // 当输入框内容改变时保存配置
+            // 自动保存
             let saveTimeout;
             formFields.forEach(field => {
-                document.getElementById(field).addEventListener('input', (e) => {
+                document.getElementById(field).addEventListener('input', () => {
                     clearTimeout(saveTimeout);
-                    saveTimeout = setTimeout(saveConfig, 1000); // 延迟1秒保存
+                    saveTimeout = setTimeout(saveConfig, 1000);
                 });
             });
 
-            // 表单提交处理
+            // 表单提交
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const resultDiv = document.getElementById('result');
-                const submitButton = document.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton.textContent;
                 
                 try {
@@ -224,43 +320,36 @@ function getConfigHTML() {
                     submitButton.innerHTML = '<span class="loading"></span>发送中...';
                     resultDiv.style.display = 'none';
                     
-                    const formData = new FormData(e.target);
-                    const response = await fetch('/send' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''), {
+                    const response = await fetch('/send' + urlParams, {
                         method: 'POST',
-                        body: formData
+                        body: new FormData(form)
                     });
                     
                     const result = await response.text();
-                    resultDiv.textContent = result;
-                    resultDiv.className = 'result ' + (response.ok ? 'success' : 'error');
-                    resultDiv.style.display = 'block';
                     
-                    if (response.ok && confirm('发送成功！是否清空表单？')) {
-                        e.target.reset();
-                        await saveConfig(); // 保存空表单
+                    if (response.ok) {
+                        showSuccess(result);
+                        if (confirm('发送成功！是否清空表单？')) {
+                            form.reset();
+                            await saveConfig();
+                        }
+                    } else {
+                        showError(result);
                     }
                 } catch (error) {
-                    resultDiv.textContent = '发送失败: ' + error.message;
-                    resultDiv.className = 'result error';
-                    resultDiv.style.display = 'block';
+                    showError('发送失败: ' + error.message);
                 } finally {
                     submitButton.disabled = false;
                     submitButton.textContent = originalButtonText;
                 }
             });
 
-            // 添加清空按钮
-            const clearButton = document.createElement('button');
-            clearButton.type = 'button';
-            clearButton.textContent = '清空表单';
-            clearButton.style.marginTop = '10px';
-            clearButton.style.backgroundColor = '#dc3545';
-            form.appendChild(clearButton);
-
+            // 清空表单
             clearButton.addEventListener('click', async () => {
                 if (confirm('确定要清空表单吗？')) {
                     form.reset();
-                    await saveConfig(); // 保存空表单
+                    await saveConfig();
+                    resultDiv.style.display = 'none';
                 }
             });
         </script>
@@ -281,29 +370,46 @@ async function handleEmailSending(emailData, env) {
         endTime: null
     };
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     try {
         // 验证必要的环境变量和数据
         if (!env.MAILERSEND_API_KEY) {
             throw new Error('MAILERSEND_API_KEY 未设置');
         }
-        if (!emailData.fromEmail || !emailData.toEmails) {
-            throw new Error('发件人或收件人邮箱未设置');
+        
+        const fromEmail = (emailData.fromEmail?.trim() || env.FROM_EMAIL?.trim());
+        if (!fromEmail) {
+            throw new Error('发件人邮箱未设置');
+        }
+        if (!emailRegex.test(fromEmail)) {
+            throw new Error('发件人邮箱格式无效');
         }
 
-        const mailersendApiKey = env.MAILERSEND_API_KEY;
-        const fromEmail = emailData.fromEmail;
-        const subject = emailData.subject || "邮件测试";
-        const body = emailData.body || "这是一封来自自动化脚本的邮件";
+        const subject = emailData.subject?.trim() || env.SUBJECT || "邮件测试";
+        const body = emailData.body?.trim() || env.BODY || "这是一封来自自动化脚本的邮件";
         
         // 验证邮件内容
         validateEmailContent(subject, body);
 
         // 解析并验证收件人邮箱
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const toEmails = env.TO_EMAILS.split('\n')
-            .map(email => email.trim())
-            .filter(email => email && emailRegex.test(email));
+        let toEmails = [];
 
+        // 优先从表单获取数据
+        if (emailData.toEmails && emailData.toEmails.trim()) {
+            toEmails = emailData.toEmails.split('\n')
+                .map(email => email.trim())
+                .filter(email => email && emailRegex.test(email));
+        }
+
+        // 如果表单数据为空且存在环境变量，则使用环境变量
+        if (toEmails.length === 0 && env && env.TO_EMAILS) {
+            toEmails = env.TO_EMAILS.split('\n')
+                .map(email => email.trim())
+                .filter(email => email && emailRegex.test(email));
+        }
+
+        // 验证是否有有效的收件人
         if (toEmails.length === 0) {
             throw new Error("没有有效的收件人邮箱地址");
         }
@@ -316,10 +422,12 @@ async function handleEmailSending(emailData, env) {
 
         for (let i = 0; i < toEmails.length; i += BATCH_SIZE) {
             const batch = toEmails.slice(i, i + BATCH_SIZE);
+            console.log(`正在处理第 ${i + 1} 到 ${Math.min(i + BATCH_SIZE, toEmails.length)} 个邮件...`);
+            
             const results = await Promise.all(
                 batch.map(async (email) => {
                     try {
-                        const success = await sendEmail(email, mailersendApiKey, fromEmail, subject, body);
+                        const success = await sendEmail(email, env.MAILERSEND_API_KEY, fromEmail, subject, body);
                         if (success) {
                             stats.success++;
                             stats.successEmails.push(email);
@@ -330,13 +438,15 @@ async function handleEmailSending(emailData, env) {
                         return { email, success };
                     } catch (error) {
                         stats.failed++;
-                        stats.failedResults.push({ email, error: error.message });
+                        stats.failedResults.push({ email, error: error.message || '发送时发生错误' });
                         return { email, success: false };
                     }
                 })
             );
 
+            // 添加延迟，避免API限制
             if (i + BATCH_SIZE < toEmails.length) {
+                console.log(`等待 ${DELAY_MS}ms 后继续...`);
                 await new Promise(resolve => setTimeout(resolve, DELAY_MS));
             }
         }
@@ -438,34 +548,54 @@ async function sendTelegramNotification(message, tgToken, tgId) {
         return;
     }
 
-    try {
+    // Telegram 消息长度限制
+    const MAX_MESSAGE_LENGTH = 4096;
+    const messages = [];
+    
+    // 如果消息超长，分段发送
+    if (message.length > MAX_MESSAGE_LENGTH) {
+        for (let i = 0; i < message.length; i += MAX_MESSAGE_LENGTH) {
+            messages.push(message.slice(i, i + MAX_MESSAGE_LENGTH));
+        }
+    } else {
+        messages.push(message);
+    }
+
+    for (const msg of messages) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-        const response = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                chat_id: tgId,
-                text: message,
-                parse_mode: 'Markdown'
-            }),
-            signal: controller.signal
-        });
+        try {
+            const response = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chat_id: tgId,
+                    text: msg,
+                    parse_mode: 'Markdown'
+                }),
+                signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Telegram API 错误: ${error}`);
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Telegram API 错误: ${error}`);
+            }
+
+            // 如果有多条消息，添加延迟避免频率限制
+            if (messages.length > 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        } catch (error) {
+            const errorMessage = error.name === 'AbortError' 
+                ? 'Telegram 通知发送超时' 
+                : error.message;
+            console.error('发送 Telegram 通知失败:', errorMessage);
         }
-    } catch (error) {
-        const errorMessage = error.name === 'AbortError' 
-            ? 'Telegram 通知发送超时' 
-            : error.message;
-        console.error('发送 Telegram 通知失败:', errorMessage);
     }
 }
 
@@ -473,6 +603,9 @@ async function sendTelegramNotification(message, tgToken, tgId) {
 function validateEmailContent(subject, body) {
     if (!subject || subject.trim().length === 0) {
         throw new Error('邮件主题不能为空');
+    }
+    if (subject.length > 998) { // RFC 2822 规范
+        throw new Error('邮件主题过长');
     }
     if (!body || body.trim().length === 0) {
         throw new Error('邮件内容不能为空');
@@ -484,7 +617,16 @@ function validateEmailContent(subject, body) {
 
 // 事件监听器
 addEventListener('fetch', event => {
-    event.respondWith(handleRequest(event.request, event.env));
+    event.respondWith(
+        handleRequest(event.request, event.env)
+            .catch(error => {
+                console.error('请求处理失败:', error);
+                return new Response('服务器内部错误', { 
+                    status: 500,
+                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+                });
+            })
+    );
 });
 
 // 定时触发器
@@ -498,6 +640,8 @@ addEventListener('scheduled', event => {
                 })
             }), 
             event.env
-        )
+        ).catch(error => {
+            console.error('定时任务执行失败:', error);
+        })
     );
 });
