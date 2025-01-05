@@ -3,7 +3,7 @@ async function handleRequest(request, env) {
     const url = new URL(request.url);
     
     // 验证 ACCESS_TOKEN
-    if (env.ACCESS_TOKEN) {
+    if (env && env.ACCESS_TOKEN) {
         const token = url.searchParams.get('token');
         if (!token || token !== env.ACCESS_TOKEN) {
             return new Response('未授权访问', { 
