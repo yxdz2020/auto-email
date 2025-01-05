@@ -15,23 +15,40 @@ async function handleRequest(request, env) {
         const body = env.BODY || "这是一封来自自动化脚本的邮件";
         const tgToken = env.TG_TOKEN;
         const tgId = env.TG_ID;
-        const toEmails = env.TO_EMAILS.split('\n').map(email => email.trim()).filter(email => email);
+
+        // 添加邮件地址格式验证
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const toEmails = env.TO_EMAILS.split('\n')
+            .map(email => email.trim())
+            .filter(email => email && emailRegex.test(email));
 
         if (toEmails.length === 0) {
             throw new Error("没有有效的收件人邮箱地址");
         }
 
+        // 添加超时处理
         const results = await Promise.all(
             toEmails.map(async (email) => {
                 try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
                     const success = await sendEmail(email, resendApiKey, fromEmail, subject, body);
+                    clearTimeout(timeoutId);
                     return { email, success, error: null };
                 } catch (error) {
-                    console.error(`发送邮件到 ${email} 时发生错误: ${error.message}`);
-                    return { email, success: false, error: error.message };
+                    // 区分超时错误和其他错误
+                    const errorMessage = error.name === 'AbortError' 
+                        ? '发送超时' 
+                        : error.message;
+                    return { email, success: false, error: errorMessage };
                 }
             })
         );
+
+        // 处理空结果的情况
+        if (results.length === 0) {
+            throw new Error("没有有效的邮件地址可以发送");
+        }
 
         // 修改后的结果分析和消息格式
         const successCount = results.filter(res => res.success).length;
@@ -50,12 +67,18 @@ ${failedResults.map(res => `${res.email}\n错误信息：${res.error}`).join('\n
         
         // 发送最终通知
         await sendTelegramNotification(resultMessage, tgToken, tgId);
-        return new Response(resultMessage, { status: 200 });
+        return new Response(resultMessage, { 
+            status: 200,
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+        });
 
     } catch (error) {
-        const errorMessage = `❌ 执行过程中发生错误: ${error.message}`;
+        const errorMessage = `❌ 执行过程中发生错误: ${error.message || '未知错误'}`;
         await sendTelegramNotification(errorMessage, env.TG_TOKEN, env.TG_ID);
-        return new Response(errorMessage, { status: 500 });
+        return new Response(errorMessage, { 
+            status: 500,
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+        });
     }
 }
 
@@ -67,6 +90,9 @@ async function sendTelegramNotification(message, tgToken, tgId) {
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const response = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
             method: 'POST',
             headers: {
@@ -77,14 +103,20 @@ async function sendTelegramNotification(message, tgToken, tgId) {
                 text: message,
                 parse_mode: 'Markdown'
             }),
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const error = await response.text();
             throw new Error(`Telegram API 错误: ${error}`);
         }
     } catch (error) {
-        console.error('发送 Telegram 通知失败:', error.message);
+        const errorMessage = error.name === 'AbortError' 
+            ? 'Telegram 通知发送超时' 
+            : error.message;
+        console.error('发送 Telegram 通知失败:', errorMessage);
     }
 }
 
@@ -92,6 +124,9 @@ async function sendTelegramNotification(message, tgToken, tgId) {
 async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body) {
     const url = 'https://api.resend.com/emails';
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -104,7 +139,10 @@ async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body) {
                 subject: subject,
                 text: body,
             }),
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         const responseData = await response.json().catch(() => ({}));
         
@@ -115,6 +153,9 @@ async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body) {
             throw new Error(`API 返回错误: ${responseData.message || '未知错误'}`);
         }
     } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('请求超时');
+        }
         console.error(`发送邮件到 ${toEmail} 失败:`, error);
         throw error;
     }
