@@ -22,11 +22,19 @@ async function handleRequest(request, env) {
                 headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
             });
         }
-
+    
         if (request.method === "GET") {
             try {
                 const config = await env.EMAIL_CONFIG.get('email_settings');
-                return new Response(config || '{}', {
+                if (!config) {
+                    return new Response('{}', {  // 如果没有配置，返回空对象
+                        headers: { 
+                            'Content-Type': 'application/json;charset=UTF-8',
+                            'Cache-Control': 'no-store'
+                        }
+                    });
+                }
+                return new Response(config, {  // 直接返回配置，因为已经是字符串
                     headers: { 
                         'Content-Type': 'application/json;charset=UTF-8',
                         'Cache-Control': 'no-store'
@@ -42,6 +50,10 @@ async function handleRequest(request, env) {
         } else if (request.method === "POST") {
             try {
                 const config = await request.json();
+                // 验证配置数据
+                if (!config || typeof config !== 'object') {
+                    throw new Error('无效的配置数据');
+                }
                 await env.EMAIL_CONFIG.put('email_settings', JSON.stringify(config));
                 return new Response('配置已保存', { 
                     status: 200,
@@ -49,7 +61,7 @@ async function handleRequest(request, env) {
                 });
             } catch (error) {
                 console.error('保存配置失败:', error);
-                return new Response('保存配置失败', { 
+                return new Response('保存配置失败: ' + error.message, { 
                     status: 500,
                     headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
                 });
@@ -172,6 +184,7 @@ function getConfigHTML() {
             }
             .clear-button {
                 background-color: #dc3545;
+                margin-top: 10px;
             }
             .clear-button:hover {
                 background-color: #c82333;
@@ -234,7 +247,6 @@ function getConfigHTML() {
             </div>
             <div class="button-group">
                 <button type="submit">发送邮件</button>
-                <button type="button" class="clear-button">清空表单</button>
             </div>
         </form>
         <div id="result" style="display: none;" class="result"></div>
@@ -245,7 +257,13 @@ function getConfigHTML() {
             const urlParams = window.location.search;
             const resultDiv = document.getElementById('result');
             const submitButton = form.querySelector('button[type="submit"]');
-            const clearButton = form.querySelector('.clear-button');
+
+            // 添加清空按钮
+            const clearButton = document.createElement('button');
+            clearButton.type = 'button';
+            clearButton.textContent = '清空表单';
+            clearButton.className = 'clear-button';  // 使用 CSS 类
+            form.appendChild(clearButton);
 
             // 显示错误信息
             function showError(message) {
@@ -261,15 +279,18 @@ function getConfigHTML() {
                 resultDiv.style.display = 'block';
             }
 
-            // 加载配置
+            // 加载KV配置
             async function loadConfig() {
                 try {
                     const response = await fetch('/config' + urlParams);
-                    if (!response.ok) throw new Error('加载配置失败');
+                    if (!response.ok) {
+                        const error = await response.text();
+                        throw new Error(error);
+                    }
                     const config = await response.json();
                     formFields.forEach(field => {
                         const element = document.getElementById(field);
-                        if (config[field]) {
+                        if (element && config[field]) {  // 添加元素存在检查
                             element.value = config[field];
                         }
                     });
@@ -279,12 +300,16 @@ function getConfigHTML() {
                 }
             }
 
-            // 保存配置
+            // 保存KV配置
             async function saveConfig() {
                 try {
-                    const config = Object.fromEntries(
-                        formFields.map(field => [field, document.getElementById(field).value])
-                    );
+                    const config = {};
+                    for (const field of formFields) {
+                        const element = document.getElementById(field);
+                        if (element) {  // 添加元素存在检查
+                            config[field] = element.value;
+                        }
+                    }
 
                     const response = await fetch('/config' + urlParams, {
                         method: 'POST',
@@ -292,9 +317,13 @@ function getConfigHTML() {
                         body: JSON.stringify(config)
                     });
 
-                    if (!response.ok) throw new Error('保存配置失败');
+                    if (!response.ok) {
+                        const error = await response.text();
+                        throw new Error(error);
+                    }
                 } catch (error) {
                     console.error('保存配置失败:', error);
+                    showError('保存配置失败: ' + error.message);
                 }
             }
 
@@ -360,6 +389,10 @@ function getConfigHTML() {
 
 // 处理邮件发送的函数
 async function handleEmailSending(emailData, env) {
+    if (!emailData || !env) {
+        throw new Error('参数无效或缺少环境变量');
+    }
+
     const stats = {
         total: 0,
         success: 0,
@@ -367,10 +400,48 @@ async function handleEmailSending(emailData, env) {
         successEmails: [],
         failedResults: [],
         startTime: new Date(),
-        endTime: null
+        endTime: null,
+        invalidEmails: [] // 添加无效邮箱记录
     };
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // 生成统计报告的函数
+    const generateReport = (isError = false, error = null) => {
+        stats.endTime = new Date();
+        const duration = (stats.endTime - stats.startTime) / 1000;        
+        const invalidEmailsSection = stats.invalidEmails.length ? 
+            `⚠️ 无效的邮箱地址：
+${stats.invalidEmails.join('\n')}
+
+` : '';
+
+        const statsSection = `📊 ${isError ? '已处理' : '邮件发送'}统计：
+总计: ${stats.total}
+成功: ${stats.success}
+失败: ${stats.failed}${!isError ? `
+用时: ${duration}秒` : ''}`;
+
+        if (isError) {
+            return `❌ 执行过程中发生错误: 
+${error?.message || '未知错误'}
+
+${invalidEmailsSection}${statsSection}`;
+        }
+
+        const successSection = stats.successEmails.length ? 
+            `✅ 成功的邮件地址：
+${stats.successEmails.join('\n')}` : '✅ 没有成功发送的邮件';
+
+        const failureSection = stats.failedResults.length ? 
+            `❌ 失败的邮件地址:
+${stats.failedResults.map(res => `${res.email}
+错误信息：${res.error}`).join('\n\n')}` : '❌ 没有发送失败的邮件';
+
+        return `${statsSection}
+
+${invalidEmailsSection}${successSection}
+
+${failureSection}`;
+    };
 
     try {
         // 验证必要的环境变量和数据
@@ -378,6 +449,7 @@ async function handleEmailSending(emailData, env) {
             throw new Error('MAILERSEND_API_KEY 未设置');
         }
         
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const fromEmail = (emailData.fromEmail?.trim() || env.FROM_EMAIL?.trim());
         if (!fromEmail) {
             throw new Error('发件人邮箱未设置');
@@ -393,24 +465,32 @@ async function handleEmailSending(emailData, env) {
         validateEmailContent(subject, body);
 
         // 解析并验证收件人邮箱
-        let toEmails = [];
-
-        // 优先从表单获取数据
-        if (emailData.toEmails && emailData.toEmails.trim()) {
-            toEmails = emailData.toEmails.split('\n')
+        const parseEmails = (emailStr) => {
+            if (!emailStr) return [];
+            
+            const invalidEmails = [];
+            const validEmails = emailStr.split('\n')
                 .map(email => email.trim())
-                .filter(email => email && emailRegex.test(email));
-        }
+                .filter(email => {
+                    if (!email) return false;
+                    if (!emailRegex.test(email)) {
+                        invalidEmails.push(email);
+                        return false;
+                    }
+                    return true;
+                });
 
-        // 如果表单数据为空且存在环境变量，则使用环境变量
-        if (toEmails.length === 0 && env && env.TO_EMAILS) {
-            toEmails = env.TO_EMAILS.split('\n')
-                .map(email => email.trim())
-                .filter(email => email && emailRegex.test(email));
-        }
+            if (invalidEmails.length > 0) {
+                console.warn('以下邮箱格式无效：\n' + invalidEmails.join('\n'));
+                stats.invalidEmails.push(...invalidEmails);
+            }
 
-        // 验证是否有有效的收件人
-        if (toEmails.length === 0) {
+            return validEmails;
+        };
+
+        // 优先使用表单数据，如果为空则使用环境变量
+        const toEmails = parseEmails(emailData.toEmails) || parseEmails(env.TO_EMAILS);
+        if (!toEmails.length) {
             throw new Error("没有有效的收件人邮箱地址");
         }
 
@@ -422,27 +502,33 @@ async function handleEmailSending(emailData, env) {
 
         for (let i = 0; i < toEmails.length; i += BATCH_SIZE) {
             const batch = toEmails.slice(i, i + BATCH_SIZE);
-            console.log(`正在处理第 ${i + 1} 到 ${Math.min(i + BATCH_SIZE, toEmails.length)} 个邮件...`);
+            const progress = Math.round((i / toEmails.length) * 100);
+            console.log(`正在处理第 ${i + 1} 到 ${Math.min(i + BATCH_SIZE, toEmails.length)} 个邮件... (${progress}%)`);
             
-            const results = await Promise.all(
-                batch.map(async (email) => {
-                    try {
-                        const success = await sendEmail(email, env.MAILERSEND_API_KEY, fromEmail, subject, body);
-                        if (success) {
-                            stats.success++;
-                            stats.successEmails.push(email);
-                        } else {
+            try {
+                const results = await Promise.all(
+                    batch.map(async (email) => {
+                        try {
+                            const success = await sendEmail(email, env.MAILERSEND_API_KEY, fromEmail, subject, body);
+                            if (success) {
+                                stats.success++;
+                                stats.successEmails.push(email);
+                            } else {
+                                stats.failed++;
+                                stats.failedResults.push({ email, error: '发送失败' });
+                            }
+                            return { email, success };
+                        } catch (error) {
                             stats.failed++;
-                            stats.failedResults.push({ email, error: '发送失败' });
+                            stats.failedResults.push({ email, error: error.message || '发送时发生错误' });
+                            return { email, success: false };
                         }
-                        return { email, success };
-                    } catch (error) {
-                        stats.failed++;
-                        stats.failedResults.push({ email, error: error.message || '发送时发生错误' });
-                        return { email, success: false };
-                    }
-                })
-            );
+                    })
+                );
+            } catch (error) {
+                console.error(`批处理发送失败:`, error);
+                // 继续处理下一批
+            }
 
             // 添加延迟，避免API限制
             if (i + BATCH_SIZE < toEmails.length) {
@@ -451,21 +537,7 @@ async function handleEmailSending(emailData, env) {
             }
         }
 
-        // 生成最终报告
-        stats.endTime = new Date();
-        const duration = (stats.endTime - stats.startTime) / 1000;
-        
-        const resultMessage = `📊 邮件发送统计：
-总数: ${stats.total}
-成功: ${stats.success}
-失败: ${stats.failed}
-用时: ${duration}秒
-
-✅ 成功的邮件地址：
-${stats.successEmails.join('\n')}
-
-❌失败的邮件地址:
-${stats.failedResults.map(res => `${res.email}\n错误信息：${res.error}`).join('\n')}`;
+        const resultMessage = generateReport();
 
         // 如果配置了 Telegram，发送通知
         if (env.TG_TOKEN && env.TG_ID) {
@@ -478,10 +550,12 @@ ${stats.failedResults.map(res => `${res.email}\n错误信息：${res.error}`).jo
         });
 
     } catch (error) {
-        const errorMessage = `❌ 执行过程中发生错误: ${error.message || '未知错误'}`;
+        const errorMessage = generateReport(true, error);
+        
         if (env.TG_TOKEN && env.TG_ID) {
             await sendTelegramNotification(errorMessage, env.TG_TOKEN, env.TG_ID);
         }
+        
         return new Response(errorMessage, { 
             status: 500,
             headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
@@ -519,14 +593,20 @@ async function sendEmail(toEmail, mailersendApiKey, fromEmail, subject, body) {
             });
 
             clearTimeout(timeoutId);
-            const responseData = await response.json().catch(() => ({}));
             
-            if (response.ok) {
+            if (!response.ok) {
+                const responseData = await response.json().catch(() => ({ message: '未知错误' }));
+                throw new Error(responseData.message || `HTTP错误: ${response.status}`);
+            }
+            
+            // 确保成功响应后返回 true
+            const responseData = await response.json().catch(() => null);
+            if (responseData) {
                 console.log(`邮件已成功发送到 ${toEmail}`);
                 return true;
-            } else {
-                throw new Error(`API 返回错误: ${responseData.message || '未知错误'}`);
             }
+            throw new Error('发送响应无效');
+
         } catch (error) {
             if (error.name === 'AbortError') {
                 throw new Error('请求超时');
@@ -535,16 +615,17 @@ async function sendEmail(toEmail, mailersendApiKey, fromEmail, subject, body) {
                 console.error(`发送邮件到 ${toEmail} 失败:`, error);
                 throw error;
             }
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
             console.log(`重试第 ${attempt} 次发送到 ${toEmail}`);
         }
     }
+    return false; // 如果所有重试都失败
 }
 
 // 发送 Telegram 通知的函数
 async function sendTelegramNotification(message, tgToken, tgId) {
-    if (!tgToken || !tgId) {
-        console.log('Telegram 配置未完成，跳过通知');
+    if (!tgToken || !tgId || !message) {
+        console.log('Telegram 配置未完成或消息为空，跳过通知');
         return;
     }
 
@@ -582,19 +663,18 @@ async function sendTelegramNotification(message, tgToken, tgId) {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`Telegram API 错误: ${error}`);
+                const errorData = await response.json().catch(() => ({ description: '未知错误' }));
+                throw new Error(`Telegram API 错误: ${errorData.description || response.statusText}`);
             }
 
-            // 如果有多条消息，添加延迟避免频率限制
             if (messages.length > 1) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         } catch (error) {
-            const errorMessage = error.name === 'AbortError' 
-                ? 'Telegram 通知发送超时' 
-                : error.message;
-            console.error('发送 Telegram 通知失败:', errorMessage);
+            console.error('发送 Telegram 通知失败:', error.message);
+            // 不抛出错误，继续处理其他消息片段
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 }
