@@ -2,7 +2,7 @@
 async function handleRequest(request, env) {
     const url = new URL(request.url);
     
-    // 验证 ACCESS_TOKEN（如果设置了的话）
+    // 验证 ACCESS_TOKEN
     if (env.ACCESS_TOKEN) {
         const token = url.searchParams.get('token');
         if (!token || token !== env.ACCESS_TOKEN) {
@@ -12,36 +12,45 @@ async function handleRequest(request, env) {
             });
         }
     }
-    
-    // 如果是访问根路径，返回配置页面
-    if (url.pathname === "/" && request.method === "GET") {
-        return new Response(getConfigHTML(), {
-            headers: { "Content-Type": "text/html;charset=UTF-8" },
-        });
-    }
 
-    // 如果是提交配置
-    if (url.pathname === "/send" && request.method === "POST") {
-        try {
-            const formData = await request.formData();
-            // 更新环境变量
-            env.FROM_EMAIL = formData.get("fromEmail");
-            env.TO_EMAILS = formData.get("toEmails");
-            env.SUBJECT = formData.get("subject");
-            env.BODY = formData.get("body");
-            
-            // 继续执行原有的邮件发送逻辑
-            return await handleEmailSending(env);
-        } catch (error) {
-            return new Response(`错误: ${error.message}`, { status: 400 });
+    // 路由处理
+    if (url.pathname === "/config") {
+        if (request.method === "GET") {
+            try {
+                const config = await env.EMAIL_CONFIG.get('email_settings');
+                return new Response(config || '{}', {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (error) {
+                return new Response('获取配置失败', { status: 500 });
+            }
+        } else if (request.method === "POST") {
+            try {
+                const config = await request.json();
+                await env.EMAIL_CONFIG.put('email_settings', JSON.stringify(config));
+                return new Response('配置已保存', { status: 200 });
+            } catch (error) {
+                return new Response('保存配置失败', { status: 500 });
+            }
         }
     }
 
-    // 其他路径返回 404
-    return new Response("Not Found", { status: 404 });
+    if (url.pathname === "/send" && request.method === "POST") {
+        const formData = await request.formData();
+        env.FROM_EMAIL = formData.get('fromEmail');
+        env.TO_EMAILS = formData.get('toEmails');
+        env.SUBJECT = formData.get('subject');
+        env.BODY = formData.get('body');
+        return handleEmailSending(env);
+    }
+
+    // 默认返回配置页面
+    return new Response(getConfigHTML(), {
+        headers: { 'Content-Type': 'text/html;charset=UTF-8' }
+    });
 }
 
-// 获取配置页面的 HTML
+// 获取配置页面 HTML
 function getConfigHTML() {
     return `
     <!DOCTYPE html>
@@ -54,54 +63,32 @@ function getConfigHTML() {
             body {
                 font-family: Arial, sans-serif;
                 max-width: 800px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f5f5f5;
-            }
-            .container {
-                background-color: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h1 {
-                color: #333;
-                text-align: center;
-                margin-bottom: 30px;
+                margin: 20px auto;
+                padding: 0 20px;
             }
             .form-group {
-                margin-bottom: 20px;
+                margin-bottom: 15px;
             }
             label {
                 display: block;
-                margin-bottom: 8px;
+                margin-bottom: 5px;
                 font-weight: bold;
-                color: #555;
             }
-            input[type="text"],
-            input[type="email"],
-            textarea {
+            input[type="text"], input[type="email"], textarea {
                 width: 100%;
-                padding: 10px;
+                padding: 8px;
                 border: 1px solid #ddd;
                 border-radius: 4px;
                 box-sizing: border-box;
-                font-size: 14px;
-            }
-            textarea {
-                height: 120px;
-                resize: vertical;
             }
             button {
                 background-color: #4CAF50;
                 color: white;
-                padding: 12px 20px;
+                padding: 10px 15px;
                 border: none;
                 border-radius: 4px;
                 cursor: pointer;
-                width: 100%;
-                font-size: 16px;
-                transition: background-color 0.3s;
+                margin-right: 10px;
             }
             button:hover {
                 background-color: #45a049;
@@ -112,20 +99,19 @@ function getConfigHTML() {
             }
             .result {
                 margin-top: 20px;
-                padding: 15px;
+                padding: 10px;
                 border-radius: 4px;
-                display: none;
                 white-space: pre-wrap;
             }
             .success {
                 background-color: #dff0d8;
-                color: #3c763d;
                 border: 1px solid #d6e9c6;
+                color: #3c763d;
             }
             .error {
                 background-color: #f2dede;
-                color: #a94442;
                 border: 1px solid #ebccd1;
+                color: #a94442;
             }
             .loading {
                 display: inline-block;
@@ -135,7 +121,7 @@ function getConfigHTML() {
                 border-top: 3px solid #3498db;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
-                margin-right: 10px;
+                margin-right: 5px;
                 vertical-align: middle;
             }
             @keyframes spin {
@@ -145,36 +131,87 @@ function getConfigHTML() {
         </style>
     </head>
     <body>
-        <div class="container">
-            <h1>邮件发送配置</h1>
-            <form id="emailForm">
-                <div class="form-group">
-                    <label for="fromEmail">发件人邮箱:</label>
-                    <input type="email" id="fromEmail" name="fromEmail" required 
-                           placeholder="例如: sender@yourdomain.com">
-                </div>
-                <div class="form-group">
-                    <label for="toEmails">收件人邮箱列表 (每行一个):</label>
-                    <textarea id="toEmails" name="toEmails" required
-                              placeholder="例如:&#10;recipient1@domain.com&#10;recipient2@domain.com"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="subject">邮件主题:</label>
-                    <input type="text" id="subject" name="subject" required
-                           placeholder="输入邮件主题">
-                </div>
-                <div class="form-group">
-                    <label for="body">邮件内容:</label>
-                    <textarea id="body" name="body" required
-                              placeholder="输入邮件正文内容"></textarea>
-                </div>
-                <button type="submit">发送邮件</button>
-            </form>
-            <div id="result" class="result"></div>
-        </div>
+        <h1>邮件发送配置</h1>
+        <form id="emailForm">
+            <div class="form-group">
+                <label for="fromEmail">发件人邮箱:</label>
+                <input type="email" id="fromEmail" name="fromEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="toEmails">收件人邮箱列表 (每行一个):</label>
+                <textarea id="toEmails" name="toEmails" rows="5" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="subject">邮件主题:</label>
+                <input type="text" id="subject" name="subject" required>
+            </div>
+            <div class="form-group">
+                <label for="body">邮件内容:</label>
+                <textarea id="body" name="body" rows="10" required></textarea>
+            </div>
+            <button type="submit">发送邮件</button>
+        </form>
+        <div id="result" style="display: none;" class="result"></div>
 
         <script>
-            document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            const form = document.getElementById('emailForm');
+            const formFields = ['fromEmail', 'toEmails', 'subject', 'body'];
+
+            // 页面加载时从 KV 获取配置
+            async function loadConfig() {
+                try {
+                    const response = await fetch('/config' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''));
+                    if (response.ok) {
+                        const config = await response.json();
+                        formFields.forEach(field => {
+                            if (config[field]) {
+                                document.getElementById(field).value = config[field];
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('加载配置失败:', error);
+                }
+            }
+
+            // 保存配置到 KV
+            async function saveConfig() {
+                try {
+                    const config = {};
+                    formFields.forEach(field => {
+                        config[field] = document.getElementById(field).value;
+                    });
+
+                    const response = await fetch('/config' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(config)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('保存配置失败');
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                }
+            }
+
+            // 页面加载时加载配置
+            window.addEventListener('load', loadConfig);
+
+            // 当输入框内容改变时保存配置
+            let saveTimeout;
+            formFields.forEach(field => {
+                document.getElementById(field).addEventListener('input', (e) => {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(saveConfig, 1000); // 延迟1秒保存
+                });
+            });
+
+            // 表单提交处理
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const resultDiv = document.getElementById('result');
                 const submitButton = document.querySelector('button[type="submit"]');
@@ -186,7 +223,7 @@ function getConfigHTML() {
                     resultDiv.style.display = 'none';
                     
                     const formData = new FormData(e.target);
-                    const response = await fetch('/send', {
+                    const response = await fetch('/send' + (new URL(window.location).searchParams.toString() ? '?' + new URL(window.location).searchParams.toString() : ''), {
                         method: 'POST',
                         body: formData
                     });
@@ -196,9 +233,9 @@ function getConfigHTML() {
                     resultDiv.className = 'result ' + (response.ok ? 'success' : 'error');
                     resultDiv.style.display = 'block';
                     
-                    if (response.ok) {
-                        // 成功后清空表单
+                    if (response.ok && confirm('发送成功！是否清空表单？')) {
                         e.target.reset();
+                        await saveConfig(); // 保存空表单
                     }
                 } catch (error) {
                     resultDiv.textContent = '发送失败: ' + error.message;
@@ -207,6 +244,21 @@ function getConfigHTML() {
                 } finally {
                     submitButton.disabled = false;
                     submitButton.textContent = originalButtonText;
+                }
+            });
+
+            // 添加清空按钮
+            const clearButton = document.createElement('button');
+            clearButton.type = 'button';
+            clearButton.textContent = '清空表单';
+            clearButton.style.marginTop = '10px';
+            clearButton.style.backgroundColor = '#dc3545';
+            form.appendChild(clearButton);
+
+            clearButton.addEventListener('click', async () => {
+                if (confirm('确定要清空表单吗？')) {
+                    form.reset();
+                    await saveConfig(); // 保存空表单
                 }
             });
         </script>
