@@ -49,3 +49,24 @@
 设置 `corn` 触发器，实现定时自动群发邮件
 
 > 另一个免费的邮件群发api：[mailersend](https://app.mailersend.com/domains)
+
+## cf worker 前端网页部署
+> 以 mailersend 为例，代码文件：mailersend_web.js
+
+### 创建 KV 命名空间：
+进入 Workers & Pages，点击 "KV"，点击 "Create a namespace"，输入名称如 "EMAIL_CONFIG"
+
+### 绑定 KV 到 Worker：
+进入您的 Worker，点击 "Settings" 标签，找到 "Variables" 部分，在 "KV Namespace Bindings" 下点击 "Add binding"填写：
+- Variable name: EMAIL_CONFIG（这是代码中使用的变量名）
+- KV namespace: 选择刚才创建的 namespace
+
+### 设置环境变量：
+- MAILERSEND_API_KEY: 您的 MailerSend API 密钥
+- ACCESS_TOKEN: 您设置的访问令牌（可选）
+- TG_TOKEN: Telegram 机器人令牌（可选）
+- TG_ID: Telegram 聊天 ID（可选）
+
+### 访问 Worker URL 时：
+- 如果设置了 ACCESS_TOKEN：使用 https://your-worker.your-subdomain.workers.dev?token=your_access_token
+- 如果没有设置 ACCESS_TOKEN：直接访问 https://your-worker.your-subdomain.workers.dev
