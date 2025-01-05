@@ -62,11 +62,15 @@
 - KV namespace: 选择刚才创建的 namespace
 
 ### 设置环境变量：
-- MAILERSEND_API_KEY: 您的 MailerSend API 密钥
+- MAILERSEND_API_KEY: 您的 MailerSend API 密钥（必须）
+- FROM_EMAIL: 发件人邮箱（必须，也可在前端网页中设置）
+- TO_EMAILS: 收件人邮箱，每行填写1个（必须，也可在前端网页中设置）
+- SUBJECT：邮件主题（必须，也可在前端网页中设置）
+- BODY：邮件内容（必须，也可在前端网页中设置）
 - ACCESS_TOKEN: 您设置的访问令牌（可选）
 - TG_TOKEN: Telegram 机器人令牌（可选）
 - TG_ID: Telegram 聊天 ID（可选）
 
 ### 访问 Worker URL 时：
-- 如果设置了 ACCESS_TOKEN：使用 https://your-worker.your-subdomain.workers.dev?token=your_access_token
+- 如果设置了 ACCESS_TOKEN：使用 https://your-worker.your-subdomain.workers.dev/?token=your_access_token
 - 如果没有设置 ACCESS_TOKEN：直接访问 https://your-worker.your-subdomain.workers.dev
