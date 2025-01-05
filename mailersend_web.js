@@ -37,11 +37,13 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/send" && request.method === "POST") {
         const formData = await request.formData();
-        env.FROM_EMAIL = formData.get('fromEmail');
-        env.TO_EMAILS = formData.get('toEmails');
-        env.SUBJECT = formData.get('subject');
-        env.BODY = formData.get('body');
-        return handleEmailSending(env);
+        const emailData = {
+            fromEmail: formData.get('fromEmail'),
+            toEmails: formData.get('toEmails'),
+            subject: formData.get('subject'),
+            body: formData.get('body')
+        }; 
+        return handleEmailSending(emailData, env);  // 传递 emailData 对象
     }
 
     // 默认返回配置页面
@@ -268,7 +270,7 @@ function getConfigHTML() {
 }
 
 // 处理邮件发送的函数
-async function handleEmailSending(env) {
+async function handleEmailSending(emailData, env) {
     const stats = {
         total: 0,
         success: 0,
@@ -280,18 +282,18 @@ async function handleEmailSending(env) {
     };
 
     try {
-        // 验证必要的环境变量
-        const requiredVars = ['MAILERSEND_API_KEY', 'FROM_EMAIL', 'TO_EMAILS'];
-        for (const varName of requiredVars) {
-            if (!env[varName]) {
-                throw new Error(`环境变量 ${varName} 未设置`);
-            }
+        // 验证必要的环境变量和数据
+        if (!env.MAILERSEND_API_KEY) {
+            throw new Error('MAILERSEND_API_KEY 未设置');
         }
-        
+        if (!emailData.fromEmail || !emailData.toEmails) {
+            throw new Error('发件人或收件人邮箱未设置');
+        }
+
         const mailersendApiKey = env.MAILERSEND_API_KEY;
-        const fromEmail = env.FROM_EMAIL;
-        const subject = env.SUBJECT || "邮件测试";
-        const body = env.BODY || "这是一封来自自动化脚本的邮件";
+        const fromEmail = emailData.fromEmail;
+        const subject = emailData.subject || "邮件测试";
+        const body = emailData.body || "这是一封来自自动化脚本的邮件";
         
         // 验证邮件内容
         validateEmailContent(subject, body);
