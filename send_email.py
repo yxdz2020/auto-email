@@ -97,7 +97,7 @@ def send_telegram_notification(tg_id, tg_token, success_emails, failed_emails_wi
 
     # 构建消息头部
     message = (
-        "🤖 邮件群发状态报告\n"
+        "🤖 **邮件群发状态报告**\n"
         f"⏰ 时间: `{now}`\n"
         f"📊 总计: `{total_count}` 个邮箱\n"
         f"✅ 成功: `{success_count}`个 | ❌ 失败: `{failure_count}`个\n\n"
