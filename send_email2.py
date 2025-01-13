@@ -1,22 +1,13 @@
 import subprocess
 import sys
 import os
+import requests
 import json
 import smtplib
 import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
-
-# 自动安装 requests 模块
-try:
-    import requests
-except ImportError:
-    print("未检测到 'requests' 模块，正在安装...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    print("'requests' 模块安装完成，正在重新运行脚本...")
-    os.execv(sys.executable, [sys.executable] + sys.argv)  # 重新运行脚本
-
 
 def load_email_config():
     """加载并验证邮件配置"""
