@@ -1,4 +1,4 @@
-name: Email Sender
+name: 自动群发邮件
 
 on:
   schedule:
@@ -29,4 +29,4 @@ jobs:
         TG_ID: ${{ secrets.TG_ID }}
         TG_TOKEN: ${{ secrets.TG_TOKEN }}
       run: |
-        python send_email.py
+        python send_email2.py
