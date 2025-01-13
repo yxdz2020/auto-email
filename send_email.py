@@ -46,6 +46,14 @@ def load_telegram_config():
 
     return tg_id, tg_token
 
+def mask_email(email):
+    """隐藏邮箱中间部分"""
+    parts = email.split('@')
+    username = parts[0]
+    domain = parts[1]
+    masked_username = username[0:3] + '*' * (len(username) - 3)
+    return f"{masked_username}@{domain}"
+
 def send_email(smtp_server, smtp_port, smtp_user, smtp_pass, from_email, to_email, subject, body):
     """发送邮件"""
     if smtp_port not in [465, 587]:
@@ -71,7 +79,8 @@ def send_email(smtp_server, smtp_port, smtp_user, smtp_pass, from_email, to_emai
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(from_email, to_email, msg.as_string())
 
-        print(f"邮件已成功发送到 {to_email}")
+        masked_email = mask_email(to_email)
+        print(f"邮件已成功发送到 {masked_email}")
         return True
 
     except Exception as e:
@@ -82,7 +91,8 @@ def send_email(smtp_server, smtp_port, smtp_user, smtp_pass, from_email, to_emai
         if smtp_pass:
             error_message = error_message.replace(smtp_pass, "[SMTP 密码错误]")
 
-        print(f"发送邮件到 {to_email} 失败: {error_message}")
+        masked_email = mask_email(to_email)
+        print(f"发送邮件到 {masked_email} 失败: {error_message}")
         traceback.print_exc()
         return False
 
@@ -111,7 +121,7 @@ def send_telegram_notification(tg_id, tg_token, success_emails, failed_emails_wi
     for email, reason in failed_emails_with_reasons.items():
         message += f"邮箱：`{email}`\n状态: ❌ 发送失败\n失败原因: {reason}\n"
 
-   # 发送消息
+    # 发送消息
     url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
     payload = {
         "chat_id": tg_id,
