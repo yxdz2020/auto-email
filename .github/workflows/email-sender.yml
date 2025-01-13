@@ -33,4 +33,4 @@ jobs:
           TG_ID: ${{ secrets.TG_ID }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
         run: |
-          python "send-email.py"  # 确保文件名与实际脚本一致
+          python "send_email.py"
