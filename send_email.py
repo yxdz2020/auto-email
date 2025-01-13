@@ -43,11 +43,10 @@ def load_telegram_config():
 
     if tg_id and not tg_id.isdigit():
         raise ValueError("Telegram 配置中的 'TG_ID' 应为数字，请检查配置。")
-    if tg_token and not tg_token.startswith("bot"):
+    if tg_token and ":" not in tg_token:
         raise ValueError("Telegram 配置中的 'TG_TOKEN' 格式不正确，请检查配置。")
 
     return tg_id, tg_token
-
 
 def send_email(smtp_server, smtp_port, smtp_user, smtp_pass, from_email, to_email, subject, body):
     """发送邮件"""
