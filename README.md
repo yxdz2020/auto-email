@@ -37,11 +37,13 @@
 在 cf 新建一个 wokrer，粘贴仓库内 `resend.js` 中的内容
 
 已完成前端界面
+
 ![](https://pan.811520.xyz/2025-01/1736779999-%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_20250113224844.webp)
 
 ### 设置以下环境变量：
 
 - RESEND_API_KEY = 填刚刚申请的 `apitoken`
+- KEY = 设置一个密码，访问`https://你项目的worker域名?key=你设置的密码`，即为前段面板
 - FROM_EMAIL = 发件人邮箱，邮箱域名必须与在 resend 中绑定的域名一致，前缀随意
 - TO_EMAILS = 收件人邮箱，支持多个邮箱地址，每行一个
 - TG_ID = TG 机器人的 chat id
@@ -52,4 +54,5 @@
 ### 绑定KV
 - KV绑定变量名/KV空间名：AUTO_EMAIL
 
-### 设置 `corn` 触发器，实现定时自动群发邮件
+### 设置 `corn` 触发器
+实现定时自动群发邮件，建议每周执行一次
