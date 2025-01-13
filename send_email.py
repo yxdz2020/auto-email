@@ -36,7 +36,6 @@ def load_email_config():
 
     return config
 
-
 def load_telegram_config():
     """加载并验证 Telegram 配置"""
     tg_id = os.getenv('TG_ID')
