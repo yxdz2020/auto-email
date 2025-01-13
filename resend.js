@@ -1,182 +1,161 @@
-// 群发邮件的主逻辑
-async function handleRequest(request, env) {
-    try {
-        // 验证必要的环境变量
-        const requiredVars = ['RESEND_API_KEY', 'FROM_EMAIL', 'TO_EMAILS', 'TG_TOKEN', 'TG_ID'];
-        for (const varName of requiredVars) {
-            if (!env[varName]) {
-                throw new Error(`环境变量 ${varName} 未设置`);
+export default {
+    async fetch(request, env, ctx) {
+      try {
+        // 加载邮件配置
+        const emailConfig = loadEmailConfig(env);
+        const { from_email, to_emails, subject, body } = emailConfig;
+  
+        // 加载 Telegram 配置
+        const { tg_id, tg_token } = loadTelegramConfig(env);
+  
+        const successEmails = [];
+        const failedEmailsWithReasons = {};
+  
+        // 群发邮件
+        for (const email of to_emails) {
+          try {
+            const result = await sendEmail(email, subject, body, env.RESEND_API_KEY, from_email);
+            if (result) {
+              successEmails.push(email);
+            } else {
+              failedEmailsWithReasons[email] = "未知错误";
             }
+          } catch (error) {
+            failedEmailsWithReasons[email] = error.message;
+          }
         }
-        
-        const resendApiKey = env.RESEND_API_KEY;
-        const fromEmail = env.FROM_EMAIL || "admin@yomoh.ggff.net";
-        const subject = env.SUBJECT || "邮件测试";
-        const body = env.BODY || "这是一封来自自动化脚本的邮件";
-        const tgToken = env.TG_TOKEN;
-        const tgId = env.TG_ID;
-
-        // 添加邮件地址格式验证
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const toEmails = env.TO_EMAILS.split('\n')
-            .map(email => email.trim())
-            .filter(email => email && emailRegex.test(email));
-
-        if (toEmails.length === 0) {
-            throw new Error("没有有效的收件人邮箱地址");
-        }
-
-        // 添加超时处理
-        const results = await Promise.all(
-            toEmails.map(async (email) => {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-                    const success = await sendEmail(email, resendApiKey, fromEmail, subject, body);
-                    clearTimeout(timeoutId);
-                    return { email, success, error: null };
-                } catch (error) {
-                    // 区分超时错误和其他错误
-                    const errorMessage = error.name === 'AbortError' 
-                        ? '发送超时' 
-                        : error.message;
-                    return { email, success: false, error: errorMessage };
-                }
-            })
-        );
-
-        // 处理空结果的情况
-        if (results.length === 0) {
-            throw new Error("没有有效的邮件地址可以发送");
-        }
-
-        // 修改后的结果分析和消息格式
-        const successCount = results.filter(res => res.success).length;
-        const failureCount = results.length - successCount;
-        const successEmails = results.filter(res => res.success).map(res => res.email);
-        const failedResults = results.filter(res => !res.success);
-        
-        const resultMessage = `📊 邮件发送统计：
-成功: ${successCount}，失败: ${failureCount}。
-
-✅ 成功的邮件地址：
-${successEmails.join('\n')}
-
-❌失败的邮件地址:
-${failedResults.map(res => `${res.email}\n错误信息：${res.error}`).join('\n')}`;
-        
-        // 发送最终通知
-        await sendTelegramNotification(resultMessage, tgToken, tgId);
-        return new Response(resultMessage, { 
-            status: 200,
-            headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
-        });
-
-    } catch (error) {
-        const errorMessage = `❌ 执行过程中发生错误: ${error.message || '未知错误'}`;
-        await sendTelegramNotification(errorMessage, env.TG_TOKEN, env.TG_ID);
-        return new Response(errorMessage, { 
-            status: 500,
-            headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
-        });
-    }
-}
-
-// 发送 Telegram 消息的函数
-async function sendTelegramNotification(message, tgToken, tgId) {
-    if (!tgToken || !tgId) {
-        console.log('Telegram 配置未完成，跳过通知');
-        return;
-    }
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-        const response = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                chat_id: tgId,
-                text: message,
-                parse_mode: 'Markdown'
-            }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Telegram API 错误: ${error}`);
-        }
-    } catch (error) {
-        const errorMessage = error.name === 'AbortError' 
-            ? 'Telegram 通知发送超时' 
-            : error.message;
-        console.error('发送 Telegram 通知失败:', errorMessage);
-    }
-}
-
-// 用于发送邮件的函数
-async function sendEmail(toEmail, resendApiKey, fromEmail, subject, body) {
-    const url = 'https://api.resend.com/emails';
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${resendApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                from: fromEmail,
-                to: toEmail,
-                subject: subject,
-                text: body,
-            }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        const responseData = await response.json().catch(() => ({}));
-        
-        if (response.ok) {
-            console.log(`邮件已成功发送到 ${toEmail}`);
-            return true;
+  
+        // 发送 Telegram 通知
+        if (tg_id && tg_token) {
+          await sendTelegramNotification(tg_id, tg_token, successEmails, failedEmailsWithReasons);
         } else {
-            throw new Error(`API 返回错误: ${responseData.message || '未知错误'}`);
+          console.log("Telegram 通知配置缺失，跳过发送 Telegram 通知。");
         }
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error('请求超时');
-        }
-        console.error(`发送邮件到 ${toEmail} 失败:`, error);
-        throw error;
+  
+        return new Response("邮件发送任务完成", { status: 200 });
+      } catch (error) {
+        console.error("脚本运行时发生异常:", error);
+        return new Response("脚本运行时发生异常", { status: 500 });
+      }
+    },
+  
+    // 支持 Cron 触发器
+    async scheduled(event, env, ctx) {
+      return await this.fetch(null, env, ctx);
+    },
+};
+  
+// 加载邮件配置
+function loadEmailConfig(env) {
+    const from_email = env.FROM_EMAIL;
+    const to_emails_raw = env.TO_EMAILS;
+    const subject = env.SUBJECT;
+    const body = env.BODY;
+  
+    if (!from_email || !to_emails_raw || !subject || !body) {
+      throw new Error("邮件配置缺失，请检查环境变量设置。");
+    }
+  
+    // 解析收件人列表
+    const to_emails = to_emails_raw
+      .split(/[\n,]+/) // 支持换行符或逗号分隔
+      .map(email => email.trim())
+      .filter(email => email.length > 0);
+  
+    if (to_emails.length === 0) {
+      throw new Error("收件人列表为空，请检查 TO_EMAILS 配置。");
+    }
+  
+    return { from_email, to_emails, subject, body };
+}
+  
+// 加载 Telegram 配置
+function loadTelegramConfig(env) {
+    const tg_id = env.TG_ID;
+    const tg_token = env.TG_TOKEN;
+  
+    if (tg_id && isNaN(Number(tg_id))) {
+      throw new Error("Telegram 配置中的 'TG_ID' 应为数字，请检查配置。");
+    }
+    if (tg_token && !tg_token.includes(":")) {
+      throw new Error("Telegram 配置中的 'TG_TOKEN' 格式不正确，请检查配置。");
+    }
+  
+    return { tg_id, tg_token };
+}
+  
+// 使用 Resend API 发送邮件
+async function sendEmail(to_email, subject, body, resendApiKey, from_email) {
+    const url = "https://api.resend.com/emails";
+    const payload = {
+      from: from_email,
+      to: [to_email],
+      subject: subject,
+      html: body,
+    };
+  
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${resendApiKey}`,
+    };
+  
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload),
+    });
+  
+    if (response.ok) {
+      console.log(`邮件已成功发送到 ${to_email}`);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error(`发送邮件到 ${to_email} 失败: ${response.status} - ${errorText}`);
+      throw new Error(`发送邮件失败: ${errorText}`);
     }
 }
-
-// HTTP 触发器 - 用于手动触发邮件发送
-addEventListener('fetch', event => {
-    event.respondWith(handleRequest(event.request, event.env));
-});
-
-// 定时触发器 - 用于自动定时发送邮件
-addEventListener('scheduled', event => {
-    event.waitUntil(
-        handleRequest(
-            new Request('https://dummy-url.com/scheduled', {
-                method: 'POST',
-                headers: new Headers({
-                    'Content-Type': 'application/json',
-                })
-            }), 
-            event.env
-        )
-    );
-});
+  
+// 发送 Telegram 通知
+async function sendTelegramNotification(tg_id, tg_token, successEmails, failedEmailsWithReasons) {
+    const now = new Date().toISOString().replace("T", " ").split(".")[0];
+  
+    // 统计成功和失败的数量
+    const successCount = successEmails.length;
+    const failureCount = Object.keys(failedEmailsWithReasons).length;
+    const totalCount = successCount + failureCount;
+  
+    // 构建消息头部
+    let message = `🤖 **邮件群发状态报告**\n⏰ 时间: \`${now}\`\n📊 总计: \`${totalCount}\` 个邮箱\n✅ 成功: \`${successCount}\`个 | ❌ 失败: \`${failureCount}\`个\n\n`;
+  
+    // 添加成功的邮箱列表
+    for (const email of successEmails) {
+      message += `邮箱：\`${email}\`\n状态: ✅ 发送成功\n`;
+    }
+  
+    // 添加失败的邮箱列表及原因
+    for (const [email, reason] of Object.entries(failedEmailsWithReasons)) {
+      message += `邮箱：\`${email}\`\n状态: ❌ 发送失败\n失败原因: ${reason}\n`;
+    }
+  
+    // 发送消息
+    const url = `https://api.telegram.org/bot${tg_token}/sendMessage`;
+    const payload = {
+      chat_id: tg_id,
+      text: message,
+      parse_mode: "Markdown",
+    };
+  
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  
+    if (response.ok) {
+      console.log("Telegram 通知发送成功");
+    } else {
+      const errorText = await response.text();
+      console.error(`Telegram 通知发送失败: ${response.status} - ${errorText}`);
+      throw new Error(`Telegram 通知发送失败: ${errorText}`);
+    }
+}
