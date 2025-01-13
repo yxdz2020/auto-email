@@ -1,5 +1,3 @@
-import subprocess
-import sys
 import os
 import requests
 import json
@@ -42,9 +40,9 @@ def load_telegram_config():
     tg_token = os.getenv('TG_TOKEN')
 
     if tg_id and not tg_id.isdigit():
-        raise ValueError("Telegram 配置中的 'TG_ID' 应为数字，请检查配置。")
+        raise ValueError("变量配置中的 'TG_ID' 应为数字，请检查配置。")
     if tg_token and ":" not in tg_token:
-        raise ValueError("Telegram 配置中的 'TG_TOKEN' 格式不正确，请检查配置。")
+        raise ValueError("变量配置中的 'TG_TOKEN' 应该包含':'，请检查配置。")
 
     return tg_id, tg_token
 
@@ -102,16 +100,16 @@ def send_telegram_notification(tg_id, tg_token, success_emails, failed_emails_wi
         "🤖 邮件群发状态报告\n"
         f"⏰ 时间: `{now}`\n"
         f"📊 总计: `{total_count}` 个邮箱\n"
-        f"✅ 成功: `{success_count}`个 | ❌ 失败: `{failure_count}`个\n"
+        f"✅ 成功: `{success_count}`个 | ❌ 失败: `{failure_count}`个\n\n"
     )
 
     # 添加成功的邮箱列表
     for email in success_emails:
-        message += f"\n邮箱：{email}\n状态: ✅ 发送成功\n"
+        message += f"邮箱：`{email}`\n状态: ✅ 发送成功\n"
 
     # 添加失败的邮箱列表及原因
     for email, reason in failed_emails_with_reasons.items():
-        message += f"\n邮箱：{email}\n状态: ❌ 发送失败\n失败原因: {reason}\n"
+        message += f"邮箱：`{email}`\n状态: ❌ 发送失败\n失败原因: {reason}\n"
 
    # 发送消息
     url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
