@@ -22,8 +22,8 @@ function checkEnvironmentVariables(env) {
 function loadEmailConfig(env) {
     const from_email = env.FROM_EMAIL;
     const to_emails_raw = env.TO_EMAILS;
-    const subject = env.SUBJECT || 测试;
-    const body = env.BODY || 这是一封自动化测试邮件;
+    const subject = (env && env.SUBJECT) || "测试";
+    const body = (env && env.BODY) || "这是一封自动化测试邮件";
 
     if (!from_email || !to_emails_raw || !subject || !body) {
         throw new Error("邮件配置缺失，请检查环境变量设置。");
