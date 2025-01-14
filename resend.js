@@ -4,15 +4,9 @@ function checkEnvironmentVariables(env) {
         'KEY',
         'FROM_EMAIL',
         'TO_EMAILS',
-        'SUBJECT',
-        'BODY',
-        'RESEND_API_KEY',
-        'TG_TOKEN',
-        'TG_ID'
+        'RESEND_API_KEY'
     ];
-
-    const missingVars = requiredVars.filter(varName => !env[varName]);
-    
+    const missingVars = requiredVars.filter(varName => !env[varName]);    
     if (missingVars.length > 0) {
         throw new Error(`缺少必需的环境变量: ${missingVars.join(', ')}`);
     }
