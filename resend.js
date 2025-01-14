@@ -4,15 +4,9 @@ function checkEnvironmentVariables(env) {
         'KEY',
         'FROM_EMAIL',
         'TO_EMAILS',
-        'SUBJECT',
-        'BODY',
-        'RESEND_API_KEY',
-        'TG_TOKEN',
-        'TG_ID'
+        'RESEND_API_KEY'
     ];
-
-    const missingVars = requiredVars.filter(varName => !env[varName]);
-    
+    const missingVars = requiredVars.filter(varName => !env[varName]);    
     if (missingVars.length > 0) {
         throw new Error(`缺少必需的环境变量: ${missingVars.join(', ')}`);
     }
@@ -22,8 +16,8 @@ function checkEnvironmentVariables(env) {
 function loadEmailConfig(env) {
     const from_email = env.FROM_EMAIL;
     const to_emails_raw = env.TO_EMAILS;
-    const subject = env.SUBJECT;
-    const body = env.BODY;
+    const subject = (env && env.SUBJECT) || "测试";
+    const body = (env && env.BODY) || "这是一封自动化测试邮件";
 
     if (!from_email || !to_emails_raw || !subject || !body) {
         throw new Error("邮件配置缺失，请检查环境变量设置。");
