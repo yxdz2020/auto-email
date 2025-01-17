@@ -30,6 +30,8 @@
 
 - TG_TOKEN = tg机器人token
 
+**手动运行一次action，之后便可自动运行，默认为每周一次。可自行在action的yml配置文件中修改自动执行频率**
+
 ## 部署方式二：cf worker
 
 到 [resend](https://resend.com/) 注册一个账号，申请 `apitoken`，并且绑定一个域名，根据 resend 的提示到域名托管商处添加相应的 dns 解析记录，有三个 `txt` 和一个 `mx` 记录。
