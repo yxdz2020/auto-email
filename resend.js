@@ -222,7 +222,7 @@ function renderHTML(lastExecution) {
             display: block;
           }
           .stat-item .value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             margin-top: 5px;
             display: block;
