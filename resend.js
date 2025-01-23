@@ -464,7 +464,7 @@ async function executeEmailTask(env, options = {}) {
       const successEmails = [];
       const failedReasons = {};
       const totalCount = to_emails.length;
-      const executionTime = new Date().toISOString().replace("T", " ").split(".")[0];
+      const executionTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }).replace("年", "-").replace("月", "-").replace("日", "");
 
       // 发送邮件
       for (let i = 0; i < totalCount; i++) {
@@ -528,7 +528,8 @@ async function executeEmailTask(env, options = {}) {
       await env.AUTO_EMAIL.put("AUTO_EMAIL", JSON.stringify(formData));
 
       // 发送 Telegram 消息通知
-      const now = new Date().toISOString().replace("T", " ").split(".")[0];
+      // 获取当前时间，并转换为北京时间
+      const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }).replace("年", "-").replace("月", "-").replace("日", "");
       const successCount = successEmails.length;
       const failureCount = Object.keys(failedReasons).length;
 
