@@ -98,6 +98,7 @@ async function sendTelegramMessage(env, message) {
 
 // 渲染前端 HTML 页面
 function renderHTML(lastExecution) {
+  const siteIcon = 'https://pan.811520.xyz/icon/email.png';
   const lastExecutionData = lastExecution ? JSON.parse(lastExecution) : null;
   const lastExecutionHTML = lastExecutionData
   ? `
@@ -170,6 +171,7 @@ function renderHTML(lastExecution) {
         <title>邮件群发工具</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" href="${siteIcon}" type="image/png">
         <style>
           :root {
             --primary-color: #4CAF50;
