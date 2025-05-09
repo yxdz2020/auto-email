@@ -34,3 +34,21 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
         run: |
           python "send_email.py"
+
+      - name: 🎉 Delete old workflow run
+        uses: yxdz2020/delete-workflow-runs@v20250101
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 50
+
+      - name: 🚗 Keep Running
+        if: github.event_name == 'schedule'
+        run: |
+          git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
+          git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}
+          git pull --rebase --autostash
+          git commit --allow-empty -m "Keep Running..."
+          git push
